@@ -617,7 +617,7 @@ function defaultConfig(){
 let cfg;
 try { cfg = JSON.parse(localStorage.getItem('a86_draft') || 'null'); } catch(e) { cfg = null; }
 /* açılış görünümü: dosyaya gömülü START (varsa) → bu tarayıcıda kaydedilen → varsayılan */
-const START = {"cfg":{"depth":500,"top":{"t":12,"color":"crosscut","surf":"soft"},"body":{"mat":"kaplama","color":"mese"},"front":{"mat":"kaplama","color":"mese","fin":"ipek","style":"serit","stripDir":"dikey"},"handle":"kanal","modules":[{"uid":"miimzhc","type":"w45","layout":"2","width":600,"hidden":false,"org":{}},{"uid":"xv7a83s","type":"w45","layout":"2","width":600,"hidden":false,"org":{}}],"sinks":[{"uid":"j7b9phh","type":"integrated","module":"miimzhc","offset":0,"w":500,"d":300,"depth":80,"faucet":"deliksiz","drain":"zarf"}],"mirrors":[{"uid":"y2otqic","shape":"dikdortgen","w":600,"h":800,"x":-300,"bottom":1120,"led":false}],"sides":{"left":{"on":true,"t":8,"full":false},"right":{"on":true,"t":8,"full":false},"mat":"front"},"handleColor":"krom","kanalFin":"front"},"cam":{"p":[-1.5274,2.1777,2.5656],"t":[0.0131,1.0697,0.0875],"proj":"persp","zoom":1}}; // açılış görünümü (2 Eki 2026'da kaydedildi)
+const START = {"cfg":{"depth":500,"top":{"t":12,"color":"titanium","surf":"soft"},"body":{"mat":"kaplama","color":"mese"},"front":{"mat":"kaplama","color":"mese","fin":"ipek","style":"duz","stripDir":"dikey"},"handle":"push","modules":[{"uid":"miimzhc","type":"c3_85","layout":"3","width":600,"hidden":false,"org":{},"sides":{"left":{"on":true,"t":9,"full":true,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":true,"mat":"kaplama","shape":"L"}}},{"uid":"xv7a83s","type":"c3_85","layout":"3","width":600,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":true,"mat":"kaplama","shape":"L"},"right":{"on":true,"t":9,"full":true,"mat":"kaplama","shape":"L"}}},{"uid":"b2open1","type":"b2","layout":"kc","width":600,"height":1200,"bottom":450,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"}},"handle":"kanal","handleColor":"krom","kanalFin":"front","hinge":"R","idr":[]}],"sinks":[{"uid":"j7b9phh","type":"integrated","module":"miimzhc","offset":0,"w":500,"d":300,"depth":80,"faucet":"deliksiz","drain":"zarf"}],"mirrors":[{"uid":"y2otqic","shape":"dikdortgen","w":600,"h":800,"x":-300,"bottom":1120,"led":true}],"sides":{"mat":"front"},"handleColor":"krom","kanalFin":"front"},"cam":{"p":[-1.3822,1.75,3.3],"t":[0.0178,0.95,0.25],"proj":"persp","zoom":1}}; // açılış görünümü (7 Eki 2026: 2 × C3-85 60 + entegre lavabo, LED ayna, B2 60×120 golalı; kullanıcının ekranından)
 if (!cfg || !Array.isArray(cfg.modules)) cfg = START && START.cfg ? clone(START.cfg) : defaultConfig();
 migrateTypes(cfg);
 const ui = {tab:'config', sel: cfg.modules[0]?.uid || null, openSet: new Set(), dims:true, edges:true, libType:'c1', linked:null, orderSel:null, search:'', filter:'all', armDelete:null,
@@ -765,7 +765,7 @@ function normalize(c = cfg){
     m.width = clamp(Math.round((+m.width || 600)/W_STEP)*W_STEP, W_MIN, W_MAX);
     m.org = m.org || {};
     m.sides = m.sides || {};
-    ['left', 'right'].forEach(k => { const s = m.sides[k] = Object.assign({}, SIDE0, m.sides[k] || {}); s.t = clamp(Math.round(+s.t) || 19, 8, 100); s.on = !!s.on; s.full = !!s.full;
+    ['left', 'right'].forEach(k => { const s = m.sides[k] = Object.assign({}, SIDE0, m.sides[k] || {}); s.t = clamp(Math.round(+s.t) || 19, 8, 100); s.on = !!s.on; s.full = !!s.full || onBase(m); // bazalı (yere basan) modülde kapama HEP yere kadar
       // kapama malzemesine göre plaka kalınlığı: kaplamada 9 / 19 mm, diğerlerinde 8 / 18 mm (malzeme değişince karşılığına çevrilir)
       // malzeme kaplama ↔ lam/lake arasında DEĞİŞİNCE 8↔9 ve 18↔19 karşılığına çevrilir (s.mat: kalınlığın seçildiği malzeme);
       // aynı malzemede elle seçilen değer korunur (ör. kaplamada 18 mm: 9 mm plakadan L ile dönülür)
@@ -2006,7 +2006,7 @@ function buildTop(mx){
     const h = new THREE.Path(), a = r.x0 - CX, b = r.x1 - CX;
     h.moveTo(a, -r.z1); h.lineTo(a, -r.z0); h.lineTo(b, -r.z0); h.lineTo(b, -r.z1); h.lineTo(a, -r.z1);
     shape.holes.push(h);
-    buildBasin(r, tg);
+    buildBasin(r, tg, X0);
   });
   const geo = new THREE.ExtrudeGeometry(shape, {depth: t, bevelEnabled: false});
   // plaka yönü: uzun kenar (2800) tezgah boyunca, kısa kenar (1200) derinlik + ön bant boyunca
@@ -2040,41 +2040,54 @@ function gapShadow(cx, cz, hw, hd, y, parent){
   const pl = new THREE.Mesh(new THREE.PlaneGeometry(W, D), mat); pl.rotation.x = -Math.PI/2; pl.position.set(cx, y, cz); pl.raycast = () => {}; pl.renderOrder = 2;
   parent.add(pl); return pl;
 }
-function buildBasin(r, tg){
+/* eviye haznesi tezgahla AYNI porselen plakadan: parçaların dokusu tezgahın plaka koordinatında (u = derinlik / SLAB_W, v = boy / SLAB_L,
+   damar tezgah boyunca). box()'ın kutu UV'si damarı ön/arka yüzlerde 90° çevirip ölçeği bozuyordu. Ön/arka yüzde desen üst kenardan aşağı devam eder */
+function slabUV(m, X0){
+  if (!m) return m;
+  const g = m.geometry, p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv, o = m.position;
+  for (let i = 0; i < uv.count; i++){
+    const x = p.getX(i) + o.x - X0, y = p.getY(i) + o.y, z = p.getZ(i) + o.z, down = TOTAL_H - y;
+    if (Math.abs(n.getZ(i)) > .5) uv.setXY(i, (z + down)/SLAB_W, x/SLAB_L);       // ön / arka yüz: damar yatay (boy boyunca)
+    else if (Math.abs(n.getX(i)) > .5) uv.setXY(i, z/SLAB_W, (x + down)/SLAB_L);  // yan yüz
+    else uv.setXY(i, z/SLAB_W, x/SLAB_L);                                          // üst / alt yüz: tezgah üstüyle aynı
+  }
+  uv.needsUpdate = true; return m;
+}
+function buildBasin(r, tg, X0 = 0){
   const c = cfg, t = c.top.t, s = r.s, tm = topMat(), w = r.x1 - r.x0, d = r.z1 - r.z0, cx = (r.x0 + r.x1)/2, cz = (r.z0 + r.z1)/2;
-  const yF = TOTAL_H - s.depth, slabB = TOTAL_H - t;
+  const yF = TOTAL_H - s.depth, slabB = TOTAL_H - t, sb = (...a) => slabUV(box(...a), X0); // plakadan parça
   if (s.depth + 12 > t){
     const yb = yF - 12, hh = slabB - yb;
-    box(w + 24, hh, 12, tm, cx, yb + hh/2, r.z0 - 6, tg);
-    box(w + 24, hh, 12, tm, cx, yb + hh/2, r.z1 + 6, tg);
-    box(12, hh, d, tm, r.x0 - 6, yb + hh/2, cz, tg);
-    box(12, hh, d, tm, r.x1 + 6, yb + hh/2, cz, tg);
-    box(w, 12, d, tm, cx, yF - 6, cz, tg);
+    sb(w + 24, hh, 12, tm, cx, yb + hh/2, r.z0 - 6, tg);
+    sb(w + 24, hh, 12, tm, cx, yb + hh/2, r.z1 + 6, tg);
+    sb(12, hh, d, tm, r.x0 - 6, yb + hh/2, cz, tg);
+    sb(12, hh, d, tm, r.x1 + 6, yb + hh/2, cz, tg);
+    sb(w, 12, d, tm, cx, yF - 6, cz, tg);
     // iç yan yüzler (tezgah altına sarkan kısım)
   } else {
-    box(w, yF - slabB, d, tm, cx, (yF + slabB)/2, cz, tg);
+    sb(w, yF - slabB, d, tm, cx, (yF + slabB)/2, cz, tg);
   }
   // kapak altı (su yolu): siyah boya gibi değil, gölgede kalan koyu ton; derzin kendisi kapak etrafındaki yumuşak gölgeyle (gapShadow) seçilir
   const underM = std('drainUnder', () => new THREE.MeshStandardMaterial({color: srgb('#5d5a55'), roughness: 1, metalness: 0, envMapIntensity: .1}));
   if (s.drain === 'gizli'){
     // porselen kapak hazneyi tam kaplar: dört kenarda 3 mm boşluk; gider kanalı arkada kapağın altında
     box(w - 0.5, 8, d - 0.5, underM, cx, yF + 4.5, cz, tg);
-    const lid = box(w - 6, 10, d - 6, tm, cx, yF + 14, cz, tg);
+    const lid = sb(w - 6, 10, d - 6, tm, cx, yF + 14, cz, tg);
     if (lid) gapShadow(cx, cz, (w - 6)/2, (d - 6)/2, yF + 19.2, tg);
   } else if (s.drain === 'rampa'){ // Eğimli Gider
     const yHi = TOTAL_H - s.depth*.42, len = d - 34, ang = Math.atan2(yHi - (yF + 6), len);
-    const ramp = box(w, 10, Math.hypot(len, yHi - yF), tm, cx, (yHi + yF + 6)/2 - 5, r.z0 + 34 + len/2, tg);
+    const ramp = sb(w, 10, Math.hypot(len, yHi - yF), tm, cx, (yHi + yF + 6)/2 - 5, r.z0 + 34 + len/2, tg);
     if (ramp) ramp.rotation.x = -ang; // eğim arkaya, bataryaya ve gidere doğru (önde yüksek, arkada alçak)
     // eğimin bitişinde gider kanalı ve üstünde porselen kapak (dört kenarda 3 mm boşluk, etrafında gölge)
     box(w - 0.5, 2, 33.5, underM, cx, yF + 1, r.z0 + 17, tg);
-    const lid = box(w - 6, 7, 28, tm, cx, yF + 6.5, r.z0 + 17, tg);
+    const lid = sb(w - 6, 7, 28, tm, cx, yF + 6.5, r.z0 + 17, tg);
     if (lid) gapShadow(cx, r.z0 + 17, (w - 6)/2, 14, yF + 10.2, tg);
   } else {
     const yE = TOTAL_H - s.depth*.22, yC = yF + 3, l = Math.max(0, (w - d)/2);
     const A = [r.x0, yE, r.z0], B = [r.x1, yE, r.z0], C = [r.x1, yE, r.z1], Dp = [r.x0, yE, r.z1], P = [cx - l, yC, cz], Q = [cx + l, yC, cz];
     const tris = [A,B,Q, A,Q,P, Dp,P,Q, Dp,Q,C, A,P,Dp, B,C,Q];
     const pos = new Float32Array(tris.length*3), uvs = new Float32Array(tris.length*2);
-    tris.forEach((p, i) => { pos.set(p, i*3); uvs[i*2] = p[2]/SLAB_W; uvs[i*2+1] = p[0]/SLAB_L; });
+    tris.forEach((p, i) => { pos.set(p, i*3); uvs[i*2] = p[2]/SLAB_W; uvs[i*2+1] = (p[0] - X0)/SLAB_L; }); // tezgahla aynı plaka koordinatı
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2)); g.computeVertexNormals();
     const mesh = new THREE.Mesh(g, topMat(true)); mesh.receiveShadow = true; tg.add(mesh);
     box(Math.max(30, 2*l + 40), 2, 7, M.dark, cx, yC + 1.2, cz, tg);
@@ -2443,7 +2456,7 @@ function renderLeft(){
         ${sideSingle(c, s.t) ? `<p class="hint" style="margin:-4px 0 10px">Tek plaka · ${s.t} mm</p>` : `<div class="lbl" style="margin-bottom:6px">Dönüş şekli</div>
         <div class="seg" style="margin-bottom:6px">${Object.keys(SIDE_SHAPES).map(sh => `<button data-act="side-shape" data-side="${k}" data-v="${sh}" aria-pressed="${s.shape === sh}"${sh !== 'L' && s.t < SIDE_JU_MIN ? ` disabled title="J ve U en az ${SIDE_JU_MIN} mm"` : ''}>${sh}</button>`).join('')}</div>
         <p class="hint" style="margin:0 0 10px">${(() => { const full = sideGeom(c, km, k, moduleX(c)).depth + SIDE_BACK; return {L:`L: ön yüz + dolaba dayalı ${SIDE_LEG} mm bacak`, J:`J: ön yüz + dolaba dayalı ${SIDE_LEG} mm bacak + dışta ${full} mm bacak`, U:`U: ön yüz + iki bacak ${full} mm (arka açık)`}[s.shape]; })()} · ${sidePlate(c, s.t, s.shape)} mm plakadan 45° gönye ile${s.t < SIDE_JU_MIN ? ` · J ve U en az ${SIDE_JU_MIN} mm` : ''}</p>`}
-        <div class="seg"><button data-act="side-full" data-side="${k}" data-v="0" aria-pressed="${!s.full}">Modül boyu</button><button data-act="side-full" data-side="${k}" data-v="1" aria-pressed="${!!s.full}">Yere kadar</button></div>` : ''}
+        <div class="seg"><button data-act="side-full" data-side="${k}" data-v="0" aria-pressed="${!s.full}"${onBase(km) ? ' disabled title="Bazalı modülde kapama yere kadar"' : ''}>Modül boyu</button><button data-act="side-full" data-side="${k}" data-v="1" aria-pressed="${!!s.full}">Yere kadar</button></div>${onBase(km) ? '<p class="hint" style="margin:6px 0 0">Bazalı modülde kapama yere kadar iner (5 mm pabuç üstünde).</p>' : ''}` : ''}
     </section>`; };
     body = (km ? `<div class="row sp"><h3 class="ttl">M${ki + 1} · ${TYPES[km.type].label}</h3><span class="tag">${km.width/10} cm</span></div>` + sideBox('left', 'Sol yan kapama') + sideBox('right', 'Sağ yan kapama')
       : '<p class="hint" style="margin:0">Kapama eklemek için 3B görünümde veya alttaki M etiketlerinden bir modül seçin. Her modülün sol ve sağ kapaması ayrı seçilir.</p>') +
