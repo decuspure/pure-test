@@ -1,0 +1,5 @@
+# Test sitesine (GitHub Pages) yalnız uygulama gider
+*
+!index.html
+!.gitignore
+!.nojekyll
