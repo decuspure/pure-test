@@ -618,6 +618,15 @@ let cfg;
 try { cfg = JSON.parse(localStorage.getItem('a86_draft') || 'null'); } catch(e) { cfg = null; }
 /* açılış görünümü: dosyaya gömülü START (varsa) → bu tarayıcıda kaydedilen → varsayılan */
 const START = {"cfg":{"depth":500,"top":{"t":12,"color":"titanium","surf":"soft"},"body":{"mat":"kaplama","color":"mese"},"front":{"mat":"kaplama","color":"mese","fin":"ipek","style":"serit","stripDir":"dikey"},"handle":"kanal","modules":[{"uid":"xf3augy","type":"c1_30","layout":"1","width":600,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"}}},{"uid":"n4bqqs6","type":"c1_30","layout":"1","width":400,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"}}},{"uid":"e3j6t9a","type":"b1","layout":"k2","width":300,"hidden":false,"org":{},"hinge":"R","bottom":590,"sides":{"left":{"on":true,"t":9,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":true,"t":9,"full":false,"mat":"kaplama","shape":"L"}},"height":1200,"handle":"kanal","handleColor":"krom","kanalFin":"front","idr":[]}],"sinks":[{"uid":"diyemkn","type":"integrated","module":"xf3augy","offset":0,"depth":80,"drain":"rampa","w":500,"d":300,"faucet":"deliksiz"}],"mirrors":[{"uid":"y2otqic","shape":"dikdortgen","w":600,"h":800,"x":-410,"bottom":1120,"led":true}],"sides":{"mat":"front"},"handleColor":"krom","kanalFin":"front"},"cam":{"p":[-1.4298,1.7541,3.3198],"t":[0.0211,1.1922,0.0689],"proj":"persp","zoom":1}}; // açılış görünümü (7 Eki 2026, kullanıcının ekranındaki sahne: C1-30 60 + C1-30 40, entegre lavabo eğimli gider, LED ayna, B1 golalı 30×120 yerden 59 cm, şerit meşe kaplama, gola, Titanium)
+/* AÇILIŞ TASARIMI SÜRÜMÜ: uygulama açılışta taslağı kaydettiği için siteyi bir kez açan herkes eski açılışı saklıyordu.
+   START her güncellendiğinde START_V değiştirilir: bu tarayıcı o sürümü henüz görmediyse kayıtlı taslak YEDEKLENİR (a86_draft_prev)
+   ve yeni açılış yüklenir; "Önceki tasarımım" düğmesi (renderStrip) yedeği geri getirir. Aynı sürümde sonraki açılışlar taslakla açılır. */
+const START_V = '2026-10-07b';
+let prevDraft = null;
+try {
+  if (cfg && Array.isArray(cfg.modules) && localStorage.getItem('a86_start') !== START_V){ prevDraft = cfg; localStorage.setItem('a86_draft_prev', JSON.stringify(cfg)); cfg = null; }
+  localStorage.setItem('a86_start', START_V);
+} catch (e) {}
 if (!cfg || !Array.isArray(cfg.modules)) cfg = START && START.cfg ? clone(START.cfg) : defaultConfig();
 migrateTypes(cfg);
 const ui = {tab:'config', sel: cfg.modules[0]?.uid || null, openSet: new Set(), dims:true, edges:true, libType:'c1', linked:null, orderSel:null, search:'', filter:'all', armDelete:null,
@@ -2629,6 +2638,7 @@ function renderStrip(){
   document.getElementById('total').textContent = fmtTL(priceOf().total);
   const linked = ui.linked && typeof Store !== 'undefined' ? Store.orders.find(o => o.id === ui.linked) : null;
   document.getElementById('linked').innerHTML = linked ? `<button class="btn" data-act="update-order" title="Bu konfigürasyonu siparişe kaydet">${esc(linked.no)} güncelle</button><button class="btn sm" data-act="unlink" aria-label="Sipariş bağlantısını kes">×</button>` : '';
+  if (prevDraft) document.getElementById('linked').insertAdjacentHTML('beforeend', `<button class="btn" data-act="restore-prev" title="Yeni açılış tasarımından önce bu tarayıcıda kayıtlı olan tasarımı geri getirir">Önceki tasarımım</button>`);
 }
 function openPriceDetail(){
   const p = priceOf();
@@ -2771,6 +2781,11 @@ document.addEventListener('click', e => {
     case 'side-shape': if (sel){ sel.sides[b.dataset.side].shape = b.dataset.v; refresh(); } break; // kapama dönüş şekli L / J / U
     case 'side-mat': cfg.sides.mat = b.dataset.v; refresh(); break;
     case 'toggle-open': { const tgt = openTargets(), allOpen = tgt.every(id => ui.openSet.has(id)); tgt.forEach(id => allOpen ? ui.openSet.delete(id) : ui.openSet.add(id)); renderStrip(); requestRender(); break; }
+    case 'restore-prev': if (prevDraft){ // yeni açılıştan önceki taslağı geri getir (bir kez)
+      cfg = prevDraft; prevDraft = null; migrateTypes(cfg); normalize();
+      Object.assign(ui, {sel: cfg.modules[0]?.uid || null, selSet: new Set(), openSet: new Set(), selMirror: cfg.mirrors[0]?.uid || null, selSink: cfg.sinks[0]?.uid || null});
+      try { localStorage.removeItem('a86_draft_prev'); } catch (e) {}
+      refresh(); toast('Önceki tasarımınız geri yüklendi'); } break;
     case 'close-all': ui.openSet.clear(); renderStrip(); requestRender(); break;
     case 'toggle-dims': ui.dims = !ui.dims; buildScene(); renderStrip(); break;
     case 'cam-front': camFront(); break;
@@ -3188,6 +3203,8 @@ initScene();
 refresh();
 Store.on(renderAll);
 Store.init();
+if (prevDraft && JSON.stringify(prevDraft.modules) === JSON.stringify(cfg.modules)){ prevDraft = null; renderStrip(); } // yedek açılışla aynıysa düğme gerekmez
+if (prevDraft) toast('Yeni açılış tasarımı yüklendi · önceki tasarımınız "Önceki tasarımım" ile geri gelir');
 try { const t = localStorage.getItem('a86_tab'); if (t && t !== 'config') setTab(t); } catch (e) {}
 </script>
 
