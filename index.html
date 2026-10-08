@@ -1,5 +1,5 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>Pure</title>
+<title>bado</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -31,6 +31,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 header.top{display:flex;align-items:center;gap:20px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
 .brand{display:flex;align-items:baseline;gap:10px}
 .brand b{font:700 22px/1 var(--f-display);letter-spacing:-.01em}
+.brand .logo{height:21px;width:auto;display:block;color:var(--ink);flex:none}
 .brand span{color:var(--muted);font-size:12px}
 nav.tabs{display:flex;gap:4px;flex-wrap:wrap}
 nav.tabs button{border:0;background:transparent;padding:7px 12px;border-radius:6px;cursor:pointer;color:var(--muted);font-weight:500}
@@ -245,7 +246,9 @@ dialog::backdrop{background:rgba(10,14,13,.45)}
   <script>/* kayıtlı tema seçimi (güneş/ay düğmesi) sayfa çizilmeden uygulanır; seçim yoksa cihazın ayarı geçerli */
   try { const t = localStorage.getItem('a86_theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
   <header class="top">
-    <div class="brand"><b>Pure</b><span>Banyo Modül Sistemi</span></div>
+    <div class="brand"><svg class="logo" viewBox="170 365 1709 635" role="img" aria-label="bado"><title>bado</title><!-- LOGO 2.pdf'ten (2026-10-08): halka + çubuk geometrisiyle vektör, renk temaya uyar -->
+      <g fill="none" stroke="currentColor" stroke-width="48"><circle cx="365" cy="805" r="171"/><circle cx="805" cy="805" r="171"/><circle cx="1244" cy="805" r="171"/><circle cx="1684" cy="805" r="171"/></g>
+      <g fill="currentColor"><rect x="170" y="365" width="48" height="440"/><rect x="951" y="608" width="48" height="197"/><rect x="1390" y="365" width="48" height="440"/></g></svg><span>Banyo Modül Sistemi</span></div>
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="config" aria-selected="true">Konfigüratör</button>
       <button role="tab" data-tab="orders" aria-selected="false">Siparişler<span class="n" id="n-orders">0</span></button>
