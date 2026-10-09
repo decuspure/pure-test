@@ -1674,6 +1674,14 @@ function buildModule(m, x0, idx, mx){
   carve(T, H, cd, bm, x0 + W - T/2, bottomY + H/2, cd/2, g, golaCut);
   box(W - 2*T, T, cd, bm, cx, bottomY + T/2, cd/2, g);
   box(W - 2*T, H - T, 9, bm, cx, bottomY + T + (H - T)/2, 4.5, g);
+  if (onBase(m)){ // bazalı modül: gövdenin altında 4 adet PLASTİK AYARLI BAZA AYAĞI (kullanıcı 2026-10-09; parça listesinde "Ayarlı baza ayağı" × 4)
+    // yerde Ø50 taban, dişli Ø22 gövde, üstte Ø44 gövdeye oturan tabla; yanlardan 60 mm, önde bazanın arkasında, arkada arkalıktan 60 mm
+    const lm = std('plinthLeg', () => new THREE.MeshStandardMaterial({color: srgb('#2b2c2e'), roughness: .62, metalness: 0}));
+    const zB = cd - 40 - 75; // baza paneli kapak yüzünden 40 mm geride; ayak onun arkasında
+    [x0 + 60, x0 + W - 60].forEach(lx => [zB, 60].forEach(lz => {
+      [[25, 8, 4], [11, bottomY - 23, 8 + (bottomY - 23)/2], [22, 15, bottomY - 7.5]].forEach(([r, h, y]) => { const p = cyl(r, h, lm, g); p.position.set(lx, y, lz); p.receiveShadow = true; });
+    }));
+  }
   const hs = drawerHeights(m), s = sinkOver(m, c, mx);
   if (!hasTop(c)) carve(W - 2*T, T, cd, bm, cx, bottomY + H - T/2, cd/2, g, golaCut); // tezgah yok: üst tabla (dolabın üstü kapalı; çanak üstüne oturur)
   else if (s){
@@ -2634,14 +2642,16 @@ function buildDims(mx){
     [-L/2, L/2].forEach(x => line([[x, 0, Z], [x, 60, Z]], g));
     const s = textPlane(`${+(L/10).toFixed(1)} cm`, 58); s.position.set(0, 62, ZS); g.add(s);
   }
-  // tezgah yüksekliği: yalnız tezgah varken, tezgahlı bölümün açık ucunda (iki uçta da boy dolap varsa aradaki boşlukta)
-  if (ctrMods(c).length && hasTop(c)){ // tezgah yoksa tezgah yüksekliği ölçüsü yok
+  // yükseklik ölçüsü: çanak lavabo varsa yerden ÇANAĞIN ÜSTÜNE (90 cm; kullanıcı 2026-10-09), yoksa tezgah üstüne (yalnız tezgah varken);
+  // tezgahlı bölümün açık ucunda (iki uçta da boy dolap varsa aradaki boşlukta)
+  const vsl = c.sinks.filter(k => k.type !== 'integrated'), hTop = vsl.length ? TOTAL_H + Math.max(...vsl.map(k => vesselH(k))) : TOTAL_H;
+  if (ctrMods(c).length && (hasTop(c) || vsl.length)){
     const first = c.modules[0], last = c.modules[c.modules.length - 1];
     const lx = !isTall(first) ? mx.run0 - 140 : !isTall(last) ? mx.run1 + 140 : mx.run0 - TALL_GAP/2;
-    line([[lx, 0, Z], [lx, TOTAL_H, Z]], g);
-    line([[lx - 30, TOTAL_H, Z], [lx + 30, TOTAL_H, Z]], g);
+    line([[lx, 0, Z], [lx, hTop, Z]], g);
+    line([[lx - 30, hTop, Z], [lx + 30, hTop, Z]], g);
     line([[lx - 30, 0, Z], [lx + 30, 0, Z]], g);
-    const s2 = textPlane(`${String(TOTAL_H/10).replace('.', ',')} cm`); s2.position.set(lx - 10, TOTAL_H/2, ZS); g.add(s2);
+    const s2 = textPlane(`${String(hTop/10).replace('.', ',')} cm`); s2.position.set(lx - 10, hTop/2, ZS); g.add(s2);
   }
   // modül kodları: hepsi dolabın önünde yere yapışık (yatay)
   c.modules.forEach((m, i) => {
