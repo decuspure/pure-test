@@ -380,10 +380,16 @@ const onBase = m => !!TYPES[m.type].base; // 10 cm bazalı, yere basan
 /* tezgah isteğe bağlı (c.top.on, varsayılan açık); yoksa kalınlığı 0 sayılır: dolap üstü tezgah üstü yerine geçer */
 const hasTop = (c = cfg) => c.top.on !== false;
 const topT = (c = cfg) => hasTop(c) ? c.top.t : 0;
+/* ÇANAK ÜST KOTU 90 CM (kullanıcı kararı 2026-10-09): çanak lavabo varsa çanağın üst kenarı yerden 90 cm; tezgah üstü = 90 − çanak yüksekliği
+   (Artis 43: 77 cm, Antao: 75,5 / 75,4 cm), askı modüller buna göre iner. Farklı yükseklikte çanaklarda tezgah en yüksek çanağa göre (alçak olanın kenarı 90'ın altında, uyarı).
+   Bazalı (yere basan) modül varsa tezgah modülün üstüne oturur (çanak kotu tutmayabilir, uyarı). Çanak yoksa (entegre eviye ya da lavabosuz) tezgah üstü 90 cm */
+const VESSEL_RIM = 900;
 function topH(c = cfg){
   const hs = c.modules.map(m => TYPES[m.type]).filter(T => T && T.base).map(T => T.H);
   if (hs.length) return Math.max(...hs) + topT(c); // yere basan (bazalı) modül varsa tezgah modül ölçüsüne göre
-  return TOP_STD; // yoksa tezgah üstü her zaman 90 cm (çanak lavabo tezgahın üstüne oturur)
+  const vs = (c.sinks || []).filter(s => s.type !== 'integrated');
+  if (vs.length) return VESSEL_RIM - Math.max(...vs.map(s => vesselH(s))); // çanak üst kenarı 90 cm
+  return TOP_STD; // yoksa tezgah üstü 90 cm
 }
 /* parts: üstten alta çekmece yükseklikleri (cm). 'R' = kalan yükseklik (boy), 'E' = kalan yükseklikten eşit pay */
 const LAYOUTS = {
@@ -863,7 +869,7 @@ function normalize(c = cfg){
   c.sinks.forEach(s => {
     if (!ids.has(s.module)) s.module = ctrMods(c)[0].uid; // lavabo boy dolaba konmaz
     if (c === cfg && s.type === 'integrated' && !intAllowed(s.module, c)){ sinkDefaults(s, 'vessel_round'); narrow++; }
-    s.depth = clamp(s.depth, 40, 80);
+    s.depth = clamp(Math.round(+s.depth || 60), 60, 120); // porselen eviye hazne derinliği 60–120 mm (kullanıcı kararı 2026-10-09)
     if (s.type !== 'integrated'){ s.type = 'vessel_round'; if (!VESSELS[s.model]) s.model = 'std'; { const mm = c.modules.find(x => x.uid === s.module), mn = vModel(s).minMod; if (mn && mm && mm.width < mn){ s.model = '4A7351'; if (c === cfg) toast(`Antao 65 en az ${mn/10} cm modüle konur; Antao 51 kondu`); } } if (isAntao(s) && !ANTAO_COLORS[s.color]) s.color = 'R1'; if (!isAntao(s)) delete s.color; s.w = vModel(s).W; s.d = vModel(s).D; delete s.vh; } // çanak modeli (std / Antao) ve Antao rengi
     else { s.w = clamp(s.w, 400, 1200); s.d = INT_D; if (!DRAINS[s.drain]) s.drain = 'zarf'; } // eksik/bozuk kayıtta gider tipi (parça listesinde "undefined" çıkmasın)
     const lim = sinkOffLim(s, c); s.offset = clamp(Math.round(+s.offset || 0), -lim, lim);
@@ -902,6 +908,10 @@ function warnings(c = cfg){
   if (!c.modules.length) out.push('Dizilimde modül yok. Soldaki kütüphaneden modül ekleyin.');
   // yerin altına inen modül (ör. kalın tezgah + yüksek askı modül ya da boy dolap alt kenarı) uyarısı
   c.modules.forEach((m, i) => { const d = moduleDims(m, c); if (!onBase(m) && d.bottomY < 0) out.push(`M${i+1}: modül yerin altına iniyor (alt kenar ${String(d.bottomY/10).replace('.', ',')} cm).`); });
+  { // çanak üst kotu 90 cm: bazalı modülde tezgah modüle oturur; farklı yükseklikte çanaklarda alçak olanın kenarı 90'ın altında kalır
+    const th = topH(c), cm = v => String(v/10).replace('.', ',');
+    (c.sinks || []).filter(s => s.type !== 'integrated').forEach(s => { const rim = th + vesselH(s); if (rim !== VESSEL_RIM) out.push(`${vModel(s).label}: çanak üst kenarı ${cm(rim)} cm (90 cm değil${c.modules.some(onBase) ? '; bazalı modül var, tezgah modüle oturuyor' : '; tezgah en yüksek çanağa göre'}).`); });
+  }
   c.modules.forEach((m,i) => {
     const s = sinkOver(m, c, mx);
     const hs = drawerHeights(m, c);
@@ -2320,6 +2330,7 @@ function slabUV(m, X0){
   }
   uv.needsUpdate = true; return m;
 }
+const DRAIN_SLOPE = 12; // eğimli gider ve zarfta taban eğimi (mm; kullanıcı 2026-10-09: önce 5, sonra 12)
 function buildBasin(r, tg, X0 = 0){
   const c = cfg, t = c.top.t, s = r.s, tm = topMat(), w = r.x1 - r.x0, d = r.z1 - r.z0, cx = (r.x0 + r.x1)/2, cz = (r.z0 + r.z1)/2;
   const yF = TOTAL_H - s.depth, slabB = TOTAL_H - t, sb = (...a) => slabUV(box(...a), X0); // plakadan parça
@@ -2341,16 +2352,16 @@ function buildBasin(r, tg, X0 = 0){
     box(w - 0.5, 8, d - 0.5, underM, cx, yF + 4.5, cz, tg);
     const lid = sb(w - 6, 10, d - 6, tm, cx, yF + 14, cz, tg);
     if (lid) gapShadow(cx, cz, (w - 6)/2, (d - 6)/2, yF + 19.2, tg);
-  } else if (s.drain === 'rampa'){ // Eğimli Gider
-    const yHi = TOTAL_H - s.depth*.42, len = d - 34, ang = Math.atan2(yHi - (yF + 6), len);
-    const ramp = sb(w, 10, Math.hypot(len, yHi - yF), tm, cx, (yHi + yF + 6)/2 - 5, r.z0 + 34 + len/2, tg);
+  } else if (s.drain === 'rampa'){ // Eğimli Gider: taban arkaya doğru YALNIZ DRAIN_SLOPE (12 mm) eğimli (kullanıcı 2026-10-09), duvarlar gizli giderdeki gibi dik
+    const len = d - 34, ang = Math.atan2(DRAIN_SLOPE, len);
+    const ramp = sb(w, 10, Math.hypot(len, DRAIN_SLOPE), tm, cx, yF + 5 + DRAIN_SLOPE/2, r.z0 + 34 + len/2, tg); // üst yüz arkada kapakla hemyüz (yF + 10), önde DRAIN_SLOPE yüksek
     if (ramp) ramp.rotation.x = -ang; // eğim arkaya, bataryaya ve gidere doğru (önde yüksek, arkada alçak)
     // eğimin bitişinde gider kanalı ve üstünde porselen kapak (dört kenarda 3 mm boşluk, etrafında gölge)
     box(w - 0.5, 2, 33.5, underM, cx, yF + 1, r.z0 + 17, tg);
     const lid = sb(w - 6, 7, 28, tm, cx, yF + 6.5, r.z0 + 17, tg);
     if (lid) gapShadow(cx, r.z0 + 17, (w - 6)/2, 14, yF + 10.2, tg);
   } else {
-    const yE = TOTAL_H - s.depth*.22, yC = yF + 3, l = Math.max(0, (w - d)/2);
+    const yC = yF + 3, yE = yC + DRAIN_SLOPE, l = Math.max(0, (w - d)/2); // zarf: kenardan ortadaki gider yarığına YALNIZ DRAIN_SLOPE (12 mm) eğim (kullanıcı 2026-10-09), duvarlar dik
     const A = [r.x0, yE, r.z0], B = [r.x1, yE, r.z0], C = [r.x1, yE, r.z1], Dp = [r.x0, yE, r.z1], P = [cx - l, yC, cz], Q = [cx + l, yC, cz];
     const tris = [A,B,Q, A,Q,P, Dp,P,Q, Dp,Q,C, A,P,Dp, B,C,Q];
     const pos = new Float32Array(tris.length*3), uvs = new Float32Array(tris.length*2);
@@ -2393,7 +2404,7 @@ function buildSink(s, mx){
   if (isAntao(s)){ buildAntao(s, cx, cz, sg); rimY = TOTAL_H + vesselH(s); }
   else if (s.type !== 'integrated'){
     // yuvarlak çanak: kenar ince ve dik, gövde alta doğru yumuşakça daralıp küçük bir ayağa oturur (çeyrek elips profil)
-    const R = VESSEL.D/2, VH = vesselH(s), t = VESSEL.wall, Rf = R*.52, foot = 4, yb = 16, N = 20, pts = [];
+    const R = VESSEL.D/2, VH = vesselH(s) - 1.5, t = VESSEL.wall, Rf = R*.52, foot = 4, yb = 16, N = 20, pts = [];
     pts.push([0.5, yb]);
     for (let i = 0; i <= N; i++){ const a = i/N*Math.PI/2; pts.push([Rf - 12 + (R - t - Rf + 12)*Math.sin(a), yb + (VH - yb)*(1 - Math.cos(a))]); } // iç yüz
     pts.push([R - t*.5, VH + 1.5]); // yuvarlatılmış kenar
@@ -2403,7 +2414,7 @@ function buildSink(s, mx){
     const lathe = new THREE.Mesh(new THREE.LatheGeometry(pts.map(p => new THREE.Vector2(p[0], p[1])), 96), mat);
     lathe.position.set(cx, TOTAL_H, cz); lathe.castShadow = lathe.receiveShadow = true; sg.add(lathe);
     const dr = cyl(19, 2, M.chrome, sg); dr.position.set(cx, TOTAL_H + yb + 1, cz);
-    rimY = TOTAL_H + VH;
+    rimY = TOTAL_H + vesselH(s);
   }
   // sifon
   const drainZ = s.type === 'integrated' && s.drain !== 'zarf' ? backZ + 22 : cz;
@@ -2794,7 +2805,7 @@ function sinkEditor(s, mx){
     <p class="hint" style="margin:0 0 10px">${vesselName(s)} · tezgah üstü ${String(topH()/10).replace('.', ',')} cm, çanak üst kotu ${String((topH() + vesselH(s))/10).replace('.', ',')} cm</p>` : `
     <div class="field"><label for="sk-w-${id}">Genişlik <output>${s.w} mm</output></label><input type="range" id="sk-w-${id}" min="400" max="1200" step="10" value="${s.w}" data-s="${id}" data-f="w"></div>
     <p class="hint" style="margin:0 0 10px">Ön-arka ${INT_D/10} cm · tezgah önünden ${INT_FRONT/10} cm geride başlar, arkada ${String((topD() - INT_FRONT - INT_D)/10).replace('.', ',')} cm batarya payı${s.depth + 12 > cfg.top.t ? ` · hazne ${s.depth + 12 - cfg.top.t} mm tezgah altına sarkar, altındaki çekmece U kesimli` : ''}</p>
-    <div class="field"><label for="sk-dep-${id}">Hazne derinliği (en çok 80) <output>${s.depth} mm</output></label><input type="range" id="sk-dep-${id}" min="40" max="80" step="5" value="${s.depth}" data-s="${id}" data-f="depth"></div>
+    <div class="field"><label for="sk-dep-${id}">Hazne derinliği (60–120) <output>${s.depth} mm</output></label><input type="range" id="sk-dep-${id}" min="60" max="120" step="5" value="${s.depth}" data-s="${id}" data-f="depth"></div>
     <div class="field"><label for="sk-dr-${id}">Gider</label><select id="sk-dr-${id}" data-s="${id}" data-f="drain">${Object.entries(DRAINS).map(([k, v]) => `<option value="${k}" ${s.drain === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`}
     <div class="seg"><button data-act="sink-f" data-id="${id}" data-f="faucet" data-v="delikli" aria-pressed="${s.faucet === 'delikli'}">Batarya delikli</button><button data-act="sink-f" data-id="${id}" data-f="faucet" data-v="deliksiz" aria-pressed="${s.faucet === 'deliksiz'}">Deliksiz</button></div>
   </div>`;
