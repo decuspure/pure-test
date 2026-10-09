@@ -585,15 +585,28 @@ const SINKS = {
   integrated:{label:'Porselen entegre'}
 };
 /* çanak lavabo: tek tip, yuvarlak, beyaz porselen, ölçü sabit (Ø43 cm) */
-const VESSEL = {D:430, H:130, Hmin:100, Hmax:200, wall:7}; // H: varsayılan yükseklik; her çanakta s.vh ile 100–200 mm (sürgü, 5 mm adım)
-const vesselH = s => (s && s.vh) || VESSEL.H;
+const VESSEL = {D:430, H:130, wall:7}; // standart yuvarlak çanak: SABİT Ø430 × 130 mm (kullanıcının gönderdiği orijinal çanak; 2026-10-09 yükseklik sürgüsü kaldırıldı)
+/* ÇANAK MODELLERİ (2026-10-09): 'std' standart yuvarlak + Villeroy & Boch ANTAO tezgah üstü lavabolar (asimetrik, taşmasız, TitanCeram).
+   Ölçüler V&B ürün sayfasından; üstten biçim üreticinin 2D teknik çiziminden (DXF, 1:10): r = gider merkezinden her 10°'de dış kenar yarıçapı (mm;
+   0° sağ, 90° arka / duvar tarafı). Kenar 10 mm, iç derinlik 115 mm; yan kesit çizimdeki gibi: dış duvar neredeyse dik, altta yuvarlak köşe, düz taban */
+const VESSELS = {
+  std:      {label:'Artis 43', code:'417943', W:430, D:430, H:130}, // V&B Artis yuvarlak tezgah üstü (kullanıcının gönderdiği çanak), beyaz,
+  '4A7240': {label:'Antao 40', W:400, D:395, H:145, r:[200,196,191,186,183,181,181,184,188,194,201,207,213,214,213,209,205,202,201,201,202,203,205,206,206,203,200,198,197,196,196,197,199,201,202,202]},
+  '4A7351': {label:'Antao 51', W:510, D:400, H:146, r:[255,245,228,210,196,186,181,180,183,189,201,214,227,239,248,253,255,256,256,254,250,243,235,226,217,209,203,200,200,203,207,215,225,238,249,256]},
+  '4A7465': {label:'Antao 65', W:650, D:400, H:146, minMod:700, r:[320,296,261,229,206,190,181,177,177,182,192,209,232,259,286,307,320,326,324,317,305,287,264,242,224,211,203,200,203,210,224,244,270,297,318,327]}
+};
+/* Antao renkleri (V&B CeramicPlus; ürün kodu = model + renk eki, ör. 4A7351R1): beyaz parlak, diğerleri mat */
+const ANTAO_COLORS = {R1:{name:'White Alpin', hex:'#f2f2ef', rough:.2}, RW:{name:'Stone White', hex:'#e2dfd8', rough:.72}, AM:{name:'Almond', hex:'#c2b19c', rough:.72}, R8:{name:'Morning Green', hex:'#9da690', rough:.72}, R7:{name:'Pure Black', hex:'#28282b', rough:.72}};
+const vModel = s => VESSELS[s && s.model] || VESSELS.std, isAntao = s => !!(s && s.type !== 'integrated' && VESSELS[s.model] && VESSELS[s.model].r);
+const vesselH = s => vModel(s).H; // çanak yüksekliği modele göre (std 130, Antao 145 / 146)
+const vesselName = s => isAntao(s) ? `Villeroy & Boch ${vModel(s).label} ${s.model}${s.color} · ${vModel(s).W} × ${vModel(s).D} × ${vModel(s).H} mm · ${ANTAO_COLORS[s.color].name}` : `Villeroy & Boch Artis 417943 · yuvarlak Ø${VESSEL.D} × ${VESSEL.H} mm · White Alpin`;
 const INT_MIN_W = 600; // porselen entegre eviye en az 60 cm modülde; daha darına yalnız çanak lavabo
 const intAllowed = (modUid, c = cfg) => hasTop(c) && (c.modules.find(m => m.uid === modUid)?.width || 0) >= INT_MIN_W; // entegre eviye tezgahın parçası: tezgah yoksa olmaz
 function sinkDefaults(s, t){
   s.type = t;
   // porselen entegre: varsayılan 50 × 30 cm, deliksiz · çanak: Ø43, batarya delikli
   if (t === 'integrated'){ s.w = 500; s.d = INT_D; s.faucet = 'deliksiz'; }
-  else { s.w = s.d = VESSEL.D; s.faucet = 'delikli'; }
+  else { s.model = s.model && VESSELS[s.model] ? s.model : 'std'; s.w = vModel(s).W; s.d = vModel(s).D; s.faucet = 'delikli'; }
 }
 const DRAINS = {gizli:'Gizli gider', rampa:'Eğimli Gider', zarf:'Zarf birleşimli gider'}; // 'rampa' anahtarı kayıt uyumu için korunur
 const MIRRORS = {yuvarlak:'Yuvarlak', dikdortgen:'Dikdörtgen', oval:'Oval', kemer:'Kemer', kapsul:'Kapsül', yuvarlakkose:'Yuvarlak köşe', organik:'Organik'};
@@ -851,7 +864,7 @@ function normalize(c = cfg){
     if (!ids.has(s.module)) s.module = ctrMods(c)[0].uid; // lavabo boy dolaba konmaz
     if (c === cfg && s.type === 'integrated' && !intAllowed(s.module, c)){ sinkDefaults(s, 'vessel_round'); narrow++; }
     s.depth = clamp(s.depth, 40, 80);
-    if (s.type !== 'integrated'){ s.type = 'vessel_round'; s.w = s.d = VESSEL.D; s.vh = clamp(Math.round((+s.vh || VESSEL.H)/5)*5, VESSEL.Hmin, VESSEL.Hmax); }
+    if (s.type !== 'integrated'){ s.type = 'vessel_round'; if (!VESSELS[s.model]) s.model = 'std'; { const mm = c.modules.find(x => x.uid === s.module), mn = vModel(s).minMod; if (mn && mm && mm.width < mn){ s.model = '4A7351'; if (c === cfg) toast(`Antao 65 en az ${mn/10} cm modüle konur; Antao 51 kondu`); } } if (isAntao(s) && !ANTAO_COLORS[s.color]) s.color = 'R1'; if (!isAntao(s)) delete s.color; s.w = vModel(s).W; s.d = vModel(s).D; delete s.vh; } // çanak modeli (std / Antao) ve Antao rengi
     else { s.w = clamp(s.w, 400, 1200); s.d = INT_D; if (!DRAINS[s.drain]) s.drain = 'zarf'; } // eksik/bozuk kayıtta gider tipi (parça listesinde "undefined" çıkmasın)
     const lim = sinkOffLim(s, c); s.offset = clamp(Math.round(+s.offset || 0), -lim, lim);
   });
@@ -1108,7 +1121,7 @@ function cutList(c = cfg){
     if (ctrMods(c).length && hasTop(c)) tops.push({part:'Porselen tezgah', L:mx.runL, W:topD(c), t:c.top.t, mat:`${topById(c.top.color).name} · ${TOP_SURF[c.top.surf].label}`});
     if (ctrMods(c).length && hasTop(c) && c.top.t > 12) tops.push({part:'Ön düşey bant (45° birleşim)', L:mx.runL, W:c.top.t, t:12, mat:'Aynı seri'});
   }
-  const sinksOut = c.sinks.map(s => ({s, label:SINKS[s.type].label + (s.type === 'integrated' ? ' · ' + DRAINS[s.drain] : ''), dims: s.type === 'integrated' ? `${s.w}×${s.d} · ${s.depth} mm` : `Ø${VESSEL.D} × ${vesselH(s)} mm · beyaz porselen`}));
+  const sinksOut = c.sinks.map(s => ({s, label:SINKS[s.type].label + (s.type === 'integrated' ? ' · ' + DRAINS[s.drain] : ''), dims: s.type === 'integrated' ? `${s.w}×${s.d} · ${s.depth} mm` : vesselName(s)}));
   // SU YÖNÜ modüle özel: BOY sütunu su yönüdür. Seçilen yön varsayılandan farklıysa (çekmece kapağı yatay, boy dolap kapağı ve kapama dikey)
   // boy/en yer değiştirir ve not çevrilir (yalnız desenli malzemede, notunda "Su yönü" olan satırlarda)
   rows.forEach(r => {
@@ -2347,11 +2360,38 @@ function buildBasin(r, tg, X0 = 0){
     box(Math.max(30, 2*l + 40), 2, 7, M.dark, cx, yC + 1.2, cz, tg);
   }
 }
+/* Villeroy & Boch Antao çanak: üstten biçim VESSELS[model].r (gider merkezinden her 10°'de dış yarıçap, teknik çizimden), yan kesit çizimden:
+   düz taban tezgaha oturur, altta ~31 mm yuvarlak köşe, dış duvar yukarı doğru hafif açılır (dik), 10 mm yuvarlak kenar, iç yüz kenardan
+   tabana yumuşak çanak eğrisi (iç derinlik 115 mm), düz iç taban ortasında gider. Halka halka (profil × açı) tek parça yüzey */
+const ANTAO_PROF = { // çizimden (yükseklik 121 birim ölçeğinde): [yükseklik, dış kenardan içeri mm]
+  out: [[0, 31.4], [3, 25], [10, 18.6], [20, 13.8], [30, 10.4], [40, 7.9], [50, 5.9], [61, 4.2], [71, 3], [81, 2], [91, 1.3], [101, .7], [111, .2]],
+  inn: [[.096, 13.5], [.19, 18.3], [.29, 23.3], [.385, 28.9], [.48, 35.1], [.577, 42.1], [.68, 50.5], [.78, 61.1], [.875, 78], [.95, 100], [.985, 116]] // [iç derinlik oranı, kenardan içeri mm]
+};
+function buildAntao(s, cx, cz, sg){
+  const V = vModel(s), H = V.H, DEP = 115, N = 108, n = V.r.length, sc = H/121, col = ANTAO_COLORS[s.color] || ANTAO_COLORS.R1;
+  const R = th => { const u = (th/(2*Math.PI))*n, i = Math.floor(u), t = u - i, p = k => V.r[((k % n) + n) % n]; // periyodik Catmull-Rom
+    const a = p(i - 1), b = p(i), c2 = p(i + 1), d = p(i + 2); return b + .5*t*(c2 - a + t*(2*a - 5*b + 4*c2 - d + t*(3*(b - c2) + d - a))); };
+  // profil satırları: ['f', yarıçap oranı, y] ya da ['i', kenardan içeri mm, y]
+  const rows = [['f', 0, 0], ['f', .55, 0]];
+  ANTAO_PROF.out.forEach(([h, ins]) => rows.push(['i', ins, h*sc]));
+  rows.push(['i', 0, H - 3], ['i', 1.2, H - .8], ['i', 5, H], ['i', 8.8, H - .8], ['i', 10, H - 3]);              // yuvarlak kenar (10 mm)
+  ANTAO_PROF.inn.forEach(([f, ins]) => rows.push(['i', ins, H - 3 - f*(DEP - 3)]));
+  rows.push(['f', .3, H - DEP + 1], ['f', 0, H - DEP]);                                                       // iç taban
+  const pos = [], idx = [], dirs = [];
+  for (let j = 0; j <= N; j++){ const th = j/N*2*Math.PI; dirs.push([Math.cos(th), -Math.sin(th), R(th)]); } // 90° = arka (−z)
+  rows.forEach(([m, v, y]) => dirs.forEach(([dx, dz, rr]) => { const r = m === 'f' ? rr*v : Math.max(0, rr - v); pos.push(dx*r, y, dz*r); }));
+  const W = N + 1; for (let i = 0; i < rows.length - 1; i++) for (let j = 0; j < N; j++){ const a = i*W + j, b = a + 1, c2 = a + W, d = c2 + 1; idx.push(a, c2, b, b, c2, d); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+  const mat = std('antao' + s.color, () => new THREE.MeshStandardMaterial({color: srgb(col.hex), roughness: col.rough, metalness: 0, envMapIntensity: .55, side: THREE.DoubleSide}));
+  const mesh = new THREE.Mesh(geo, mat); mesh.position.set(cx, TOTAL_H, cz); mesh.castShadow = mesh.receiveShadow = true; sg.add(mesh);
+  const dr = cyl(19, 2, s.color === 'R1' ? M.chrome : mat, sg); dr.position.set(cx, TOTAL_H + H - DEP + 1.5, cz);   // gider kapağı (renkli modelde seramik kapak)
+}
 function buildSink(s, mx){
   if (s.type === 'integrated' && !intRanges(cfg, mx).some(r => r.s === s)) return; // çakışan eviye çizilmez (tezgah deliği/hazne ile tutarlı)
   const c = cfg, cx = sinkCenterX(s, c, mx), cz = sinkZ(s, c), sg = new THREE.Group(); sg.userData.sink = s.uid; root.add(sg);
   let backZ = cz - s.d/2, rimY = TOTAL_H;
-  if (s.type !== 'integrated'){
+  if (isAntao(s)){ buildAntao(s, cx, cz, sg); rimY = TOTAL_H + vesselH(s); }
+  else if (s.type !== 'integrated'){
     // yuvarlak çanak: kenar ince ve dik, gövde alta doğru yumuşakça daralıp küçük bir ayağa oturur (çeyrek elips profil)
     const R = VESSEL.D/2, VH = vesselH(s), t = VESSEL.wall, Rf = R*.52, foot = 4, yb = 16, N = 20, pts = [];
     pts.push([0.5, yb]);
@@ -2743,8 +2783,15 @@ function sinkEditor(s, mx){
     <div class="field"><label for="sk-type-${id}">Tip</label><select id="sk-type-${id}" data-s="${id}" data-f="type">${Object.entries(SINKS).map(([k, v]) => `<option value="${k}" ${s.type === k ? 'selected' : ''} ${k === 'integrated' && !intAllowed(s.module) ? 'disabled' : ''}>${v.label}${k === 'integrated' && !intAllowed(s.module) ? (hasTop() ? ` (en az ${INT_MIN_W/10} cm modül)` : ' (tezgah yok)') : ''}</option>`).join('')}</select></div>
     <div class="field"><label for="sk-mod-${id}">Modül</label><select id="sk-mod-${id}" data-s="${id}" data-f="module">${modOpts}</select></div>
     <div class="field"><label for="sk-off-${id}">Konum (modül merkezine göre) <output>${s.offset} mm</output></label><input type="range" id="sk-off-${id}" min="${-Math.floor(sinkOffLim(s))}" max="${Math.floor(sinkOffLim(s))}" step="5" value="${s.offset}" data-s="${id}" data-f="offset"${sinkOffLim(s) < 5 ? ' disabled' : ''}></div>
-    ${vessel ? `<div class="field"><label for="sk-vh-${id}">Çanak yüksekliği <output>${vesselH(s)} mm</output></label><input type="range" id="sk-vh-${id}" min="${VESSEL.Hmin}" max="${VESSEL.Hmax}" step="5" value="${vesselH(s)}" data-s="${id}" data-f="vh"></div>
-    <p class="hint" style="margin:0 0 10px">Yuvarlak çanak · Ø${VESSEL.D} × ${vesselH(s)} mm · beyaz porselen · tezgah üstü ${String(topH()/10).replace('.', ',')} cm, çanak üst kotu ${String((topH() + vesselH(s))/10).replace('.', ',')} cm</p>` : `
+    ${vessel ? `
+    <div class="lbl" style="margin-bottom:6px">Model</div>
+    <div class="seg" style="margin-bottom:10px;flex-wrap:wrap">${Object.entries(VESSELS).map(([k, v]) => { const off = v.minMod && (cfg.modules.find(m => m.uid === s.module) || {}).width < v.minMod; // Antao 65 en az 70 cm modülde
+      return `<button data-act="sink-f" data-id="${id}" data-f="model" data-v="${k}" aria-pressed="${vModel(s) === v}"${off ? ` disabled title="En az ${v.minMod/10} cm modüle konur"` : ''}>${v.label}</button>`; }).join('')}</div>
+    ${Object.values(VESSELS).some(v => v.minMod && (cfg.modules.find(m => m.uid === s.module) || {}).width < v.minMod) ? `<p class="hint" style="margin:-4px 0 10px">Antao 65 en az 70 cm modüle konur.</p>` : ''}
+    ${isAntao(s) ? `<div class="lbl" style="margin-bottom:6px">Renk</div>
+    <div class="sw">${Object.entries(ANTAO_COLORS).map(([k, v]) => `<button data-act="sink-f" data-id="${id}" data-f="color" data-v="${k}" aria-pressed="${s.color === k}" title="${v.name}" style="background:${v.hex}"></button>`).join('')}</div>
+    <div class="swname">${ANTAO_COLORS[s.color].name}</div>` : ''}
+    <p class="hint" style="margin:0 0 10px">${vesselName(s)} · tezgah üstü ${String(topH()/10).replace('.', ',')} cm, çanak üst kotu ${String((topH() + vesselH(s))/10).replace('.', ',')} cm</p>` : `
     <div class="field"><label for="sk-w-${id}">Genişlik <output>${s.w} mm</output></label><input type="range" id="sk-w-${id}" min="400" max="1200" step="10" value="${s.w}" data-s="${id}" data-f="w"></div>
     <p class="hint" style="margin:0 0 10px">Ön-arka ${INT_D/10} cm · tezgah önünden ${INT_FRONT/10} cm geride başlar, arkada ${String((topD() - INT_FRONT - INT_D)/10).replace('.', ',')} cm batarya payı${s.depth + 12 > cfg.top.t ? ` · hazne ${s.depth + 12 - cfg.top.t} mm tezgah altına sarkar, altındaki çekmece U kesimli` : ''}</p>
     <div class="field"><label for="sk-dep-${id}">Hazne derinliği (en çok 80) <output>${s.depth} mm</output></label><input type="range" id="sk-dep-${id}" min="40" max="80" step="5" value="${s.depth}" data-s="${id}" data-f="depth"></div>
@@ -3137,7 +3184,7 @@ function onField(e, live){
   }
   if (t.dataset.s){
     const s = cfg.sinks.find(x => x.uid === t.dataset.s), f = t.dataset.f;
-    s[f] = ['offset', 'w', 'depth', 'vh'].includes(f) ? +t.value : t.value;
+    s[f] = ['offset', 'w', 'depth'].includes(f) ? +t.value : t.value;
     if (f === 'type') sinkDefaults(s, t.value);
     if (f === 'module') s.offset = 0;
     if (live){ const o = t.parentElement.querySelector('output'); if (o) o.textContent = t.value + ' mm'; scheduleBuild(); }
