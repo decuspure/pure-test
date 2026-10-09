@@ -2814,7 +2814,7 @@ function renderRight(){
       ${Tt.Wopts ? `<div class="lbl" style="margin-bottom:6px">Genişlik</div><div class="seg" style="margin-bottom:10px">${Tt.Wopts.map(v => `<button data-act="mset" data-k="width" data-v="${v}" aria-pressed="${m.width === v}">${v/10} cm</button>`).join('')}</div>`
         + (Tt.wash ? `<p class="hint" style="margin:-4px 0 10px">Derinlik ${Tt.D/10} cm (sabit) · Vauth-Sagel ENVI Space XX Pro ${WASH[washModel(m.width)].name.replace('RAYLI ÇAMAŞIR SEPETİ ', '').toLowerCase()} (${WASH[washModel(m.width)].code})${m.width > washModel(m.width) + 20 ? ` · iki yanda ${(m.width - washModel(m.width))/2} mm dolgu` : ''}</p>` : '')
         : Tt.Wmin === Tt.Wmax ? `<p class="hint" style="margin:0 0 10px">Genişlik ${Tt.W/10} cm · derinlik ${Tt.D/10} cm${Tt.Hmin === Tt.Hmax ? ` · yükseklik ${Tt.H/10} cm` : ''} (sabit)${Tt.pantry ? ` · Vauth-Sagel VS TAL Gate ${Tt.tg.set}, ${Tt.trays} Planero sepet` : ''}</p>` : wField('m-width', 'm', m.width, Tt.Wmin, Tt.Wmax, Tt.Wstep || W_STEP)}
-      ${Tt.Hopts ? `<div class="lbl" style="margin-bottom:6px">Yükseklik</div><div class="seg" style="margin-bottom:10px;flex-wrap:wrap">${Tt.Hopts.map(v => `<button data-act="mset" data-k="height" data-v="${v}" aria-pressed="${m.height === v}">${v/10}</button>`).join('')}</div>`
+      ${Tt.Hopts ? `<div class="field"><label for="m-height">Yükseklik <output>${m.height} mm</output></label><input type="range" id="m-height" min="${Tt.Hmin}" max="${Tt.Hmax}" step="50" value="${m.height}" data-m="height"></div>` // sürgü; normalize izinli değerlere (Hopts) çeker
         : Tt.Hmin === Tt.Hmax ? '' : `<div class="field"><label for="m-height">Yükseklik <output>${m.height} mm</output></label><input type="range" id="m-height" min="${layoutOf(m).hMin || Tt.Hmin}" max="${Tt.Hmax}" step="100" value="${m.height}" data-m="height"></div>`}
       ${tallElcik(m) ? `<div class="lbl" style="margin-bottom:6px">Elcik</div>
       <div class="seg"><button data-act="mset" data-k="elcikSide" data-v="L" aria-pressed="${m.elcikSide === 'L'}">Sol kapakta</button><button data-act="mset" data-k="elcikSide" data-v="R" aria-pressed="${m.elcikSide === 'R'}">Sağ kapakta</button></div>` : tallPair(m) ? '' : `<div class="lbl" style="margin-bottom:6px">Menteşe</div>
@@ -3116,8 +3116,9 @@ function onField(e, live){
     refresh({left:false}); return true;
   }
   if ((t.dataset.m === 'bottom' || t.dataset.m === 'height') && m){ // boy dolap alt kenarı / yüksekliği: sürgü canlı
-    m[t.dataset.m] = +t.value;
-    if (live){ const o = t.closest('.field').querySelector('output'); if (o) o.textContent = t.value + ' mm'; scheduleBuild(); }
+    const ho = t.dataset.m === 'height' && TYPES[m.type].Hopts, v = ho ? ho.reduce((a, b) => Math.abs(b - t.value) < Math.abs(a - t.value) ? b : a) : +t.value; // B1 Çamaşır: izinli yüksekliklere çeker
+    m[t.dataset.m] = v;
+    if (live){ const o = t.closest('.field').querySelector('output'); if (o) o.textContent = v + ' mm'; scheduleBuild(); }
     else refresh({left:false});
     return true;
   }
