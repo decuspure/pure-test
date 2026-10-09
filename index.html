@@ -2305,12 +2305,12 @@ function buildTop(mx){
 }
 /* gider kapağı çevresindeki 3 mm derzi gölge gibi gösterir (siyah çizgi/boya değil): kapak üst yüzü hizasında yumuşak kenarlı,
    yarı saydam koyu bir halka; derzde en koyu, kapak ve hazne yüzeyine doğru birkaç mm'de söner. hw, hd: kapağın yarı ölçüleri */
-function gapShadow(cx, cz, hw, hd, y, parent){
+function gapShadow(cx, cz, hw, hd, y, parent, str = 1){ // str: gölge şiddeti (zarf yuvası kapağında hafif)
   const pad = 9, W = 2*(hw + pad), D = 2*(hd + pad), k = Math.min(4, 1024/Math.max(W, D)); // px/mm
   const cv = document.createElement('canvas'); cv.width = Math.ceil(W*k); cv.height = Math.ceil(D*k);
   const x = cv.getContext('2d'), gap = 3*k;
-  x.strokeStyle = 'rgba(0,0,0,.42)'; x.lineWidth = gap; x.shadowColor = 'rgba(0,0,0,.55)'; x.shadowBlur = 5*k;
-  for (let i = 0; i < 2; i++) x.strokeRect(pad*k - gap/2, pad*k - gap/2, 2*hw*k + gap, 2*hd*k + gap); // iki kat: derzde koyulaşır
+  x.strokeStyle = `rgba(0,0,0,${.42*str})`; x.lineWidth = gap; x.shadowColor = `rgba(0,0,0,${.55*str})`; x.shadowBlur = 5*k;
+  for (let i = 0; i < (str < 1 ? 1 : 2); i++) x.strokeRect(pad*k - gap/2, pad*k - gap/2, 2*hw*k + gap, 2*hd*k + gap); // iki kat: derzde koyulaşır
   const tex = new THREE.CanvasTexture(cv);
   const mat = new THREE.MeshBasicMaterial({map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2});
   mat.userData.temp = true; // sahne yeniden kurulunca doku ve malzeme bırakılır (disposeTree)
@@ -2361,14 +2361,23 @@ function buildBasin(r, tg, X0 = 0){
     const lid = sb(w - 6, 7, 28, tm, cx, yF + 6.5, r.z0 + 17, tg);
     if (lid) gapShadow(cx, r.z0 + 17, (w - 6)/2, 14, yF + 10.2, tg);
   } else {
-    const yC = yF + 3, yE = yC + DRAIN_SLOPE, l = Math.max(0, (w - d)/2); // zarf: kenardan ortadaki gider yarığına YALNIZ DRAIN_SLOPE (12 mm) eğim (kullanıcı 2026-10-09), duvarlar dik
-    const A = [r.x0, yE, r.z0], B = [r.x1, yE, r.z0], C = [r.x1, yE, r.z1], Dp = [r.x0, yE, r.z1], P = [cx - l, yC, cz], Q = [cx + l, yC, cz];
-    const tris = [A,B,Q, A,Q,P, Dp,P,Q, Dp,Q,C, A,P,Dp, B,C,Q];
+    // ZARF (kullanıcının üstten çizimi, 2026-10-09): dört kenardan ortadaki DİKDÖRTGEN gider yuvasına DRAIN_SLOPE (12 mm) eğimli dört yüz;
+    // köşelerden yuvanın köşelerine çizgiler (zarf görünümü), duvarlar dik; yuvada porselen KAPAK (dört kenarda 3 mm boşluk, etrafında gölge)
+    const yC = yF + 3, yE = yC + DRAIN_SLOPE, sl = Math.min(w - 80, Math.max(120, Math.round(w*.3))), sw = 40; // yuva: boy ~ hazne eninin %30'u, en 40 mm
+    const A = [r.x0, yE, r.z0], B = [r.x1, yE, r.z0], C = [r.x1, yE, r.z1], Dp = [r.x0, yE, r.z1];
+    const a = [cx - sl/2, yC, cz - sw/2], b = [cx + sl/2, yC, cz - sw/2], c3 = [cx + sl/2, yC, cz + sw/2], dd = [cx - sl/2, yC, cz + sw/2];
+    const tris = [A,B,b, A,b,a, B,C,c3, B,c3,b, C,Dp,dd, C,dd,c3, Dp,A,a, Dp,a,dd];
     const pos = new Float32Array(tris.length*3), uvs = new Float32Array(tris.length*2);
     tris.forEach((p, i) => { pos.set(p, i*3); uvs[i*2] = p[2]/SLAB_W; uvs[i*2+1] = (p[0] - X0)/SLAB_L; }); // tezgahla aynı plaka koordinatı
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2)); g.computeVertexNormals();
     const mesh = new THREE.Mesh(g, topMat(true)); mesh.receiveShadow = true; tg.add(mesh);
-    box(Math.max(30, 2*l + 40), 2, 7, M.dark, cx, yC + 1.2, cz, tg);
+    // zarf birleşim çizgileri (dört porselen parçanın gönye derzleri): köşelerden yuvanın köşelerine ince koyu çizgi
+    const jm = std('zarfJoint', () => new THREE.LineBasicMaterial({color: 0x34332f, transparent: true, opacity: .8}));
+    const jl = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([[A, a], [B, b], [C, c3], [Dp, dd]].flat().map(p => new THREE.Vector3(p[0], p[1] + .4, p[2]))), jm); jl.raycast = () => {}; tg.add(jl);
+    const noEdge = m => { if (m) m.children.filter(o => o.isLineSegments).forEach(o => m.remove(o)); return m; }; // kapak çevresinde siyah kenar çizgisi olmasın (kullanıcı: "çok siyah")
+    noEdge(box(sl - 0.5, 2, sw - 0.5, underM, cx, yC - 5, cz, tg));                                    // yuvanın dibi (gölgede)
+    const lid = noEdge(sb(sl - 6, 6, sw - 6, tm, cx, yC - 3, cz, tg));                                 // porselen kapak, üstü yuva ağzıyla hemyüz
+    if (lid) gapShadow(cx, cz, (sl - 6)/2, (sw - 6)/2, yC + .2, tg, .45);                             // derz gölgesi hafif
   }
 }
 /* Villeroy & Boch Antao çanak: üstten biçim VESSELS[model].r (gider merkezinden her 10°'de dış yarıçap, teknik çizimden), yan kesit çizimden:
@@ -2390,7 +2399,9 @@ function buildAntao(s, cx, cz, sg){
   rows.push(['f', .3, H - DEP + 1], ['f', 0, H - DEP]);                                                       // iç taban
   const pos = [], idx = [], dirs = [];
   for (let j = 0; j <= N; j++){ const th = j/N*2*Math.PI; dirs.push([Math.cos(th), -Math.sin(th), R(th)]); } // 90° = arka (−z)
-  rows.forEach(([m, v, y]) => dirs.forEach(([dx, dz, rr]) => { const r = m === 'f' ? rr*v : Math.max(0, rr - v); pos.push(dx*r, y, dz*r); }));
+  // dış ölçü üreticinin verdiği en × derinliğe tam oturur (çizimden okunan yarıçaplar ±1,5 mm sapıyordu)
+  const ex = dirs.map(([dx, dz, rr]) => [dx*rr, dz*rr]), kx = V.W/(Math.max(...ex.map(p => p[0])) - Math.min(...ex.map(p => p[0]))), kz = V.D/(Math.max(...ex.map(p => p[1])) - Math.min(...ex.map(p => p[1])));
+  rows.forEach(([m, v, y]) => dirs.forEach(([dx, dz, rr]) => { const r = m === 'f' ? rr*v : Math.max(0, rr - v); pos.push(dx*r*kx, y, dz*r*kz); }));
   const W = N + 1; for (let i = 0; i < rows.length - 1; i++) for (let j = 0; j < N; j++){ const a = i*W + j, b = a + 1, c2 = a + W, d = c2 + 1; idx.push(a, c2, b, b, c2, d); }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
   const mat = std('antao' + s.color, () => new THREE.MeshStandardMaterial({color: srgb(col.hex), roughness: col.rough, metalness: 0, envMapIntensity: .55, side: THREE.DoubleSide}));
@@ -3530,6 +3541,16 @@ Store.init();
 if (prevDraft && JSON.stringify(prevDraft.modules) === JSON.stringify(cfg.modules)){ prevDraft = null; renderStrip(); } // yedek açılışla aynıysa düğme gerekmez
 if (prevDraft) toast('Yeni açılış tasarımı yüklendi · önceki tasarımınız "Önceki tasarımım" ile geri gelir');
 try { const t = localStorage.getItem('a86_tab'); if (t && t !== 'config') setTab(t); } catch (e) {}
+/* CANLI YENİLEME (yalnız yerel önizleme, localhost; test sitesi ve artifact'ta çalışmaz): index.html diske yazılınca (.claude/serve.ps1 /__mtime)
+   sayfa kendini yeniler. Tasarım zaten taslakta (a86_draft); kamera ve seçim sessionStorage ile korunur */
+if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)){
+  try { const v = JSON.parse(sessionStorage.getItem('a86_live') || 'null'); sessionStorage.removeItem('a86_live');
+    if (v && camera && controls){ camera.position.fromArray(v.p); controls.target.fromArray(v.t); controls.update(); if (v.sel){ ui.sel = v.sel; ui.selSet = new Set(v.ss || []); refresh(); } requestRender(); } } catch (e) {}
+  let last = null;
+  setInterval(async () => { try { const t = await (await fetch('/__mtime', {cache: 'no-store'})).text(); if (!/^\d+$/.test(t)) return;
+    if (last && t !== last){ sessionStorage.setItem('a86_live', JSON.stringify({p: camera.position.toArray(), t: controls.target.toArray(), sel: ui.sel, ss: [...(ui.selSet || [])]})); location.reload(); }
+    last = t; } catch (e) {} }, 1500);
+}
 </script>
 
 </body></html>
