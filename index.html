@@ -360,9 +360,9 @@ const TYPES = {
   c3_85:{cat:'c3', label:'C3 · 85 cm (bazalı)', short:'C3-85', H:850, base:true},
   b1:{cat:'b1', label:'B1 - Boy', short:'B1', H:1200, Hmin:1200, Hmax:1800, W:300, Wmin:300, Wmax:500, D:350, tall:true}, // derinlik 35 cm SABİT (ayarı yok) // duvara asılı boy dolap: iki kapak, arada gola
   b2:{cat:'b2', label:'B2 - Çift Kapak Boy', short:'B2', H:1200, Hmin:800, Hmax:1800, W:600, Wmin:600, Wmax:1000, Wstep:100, D:350, tall:true, pair:true}, // duvara asılı, iki gövde, yan yana iki kapak (sol/sağ menteşe), gola ise ortada dikey
-  b1k150:{cat:'b1', label:'B1 - Kiler 150', short:'B1-K150', H:1500, Hmin:1500, Hmax:1500, W:450, Wmin:450, Wmax:450, D:520, tall:true, pantry:true, trays:4, tg:{set:'1450–1700 mm', frame:['90006622', '4 kiler çerçevesi 400/450 mm']}}, // KİLER MEKANİZMALI BOY DOLAP (2026-10-09): en 45 / derinlik 52 / boy SABİT; Vauth-Sagel VS TAL Gate Planero Lava, 4 sepet
-  b1k175:{cat:'b1', label:'B1 - Kiler 175', short:'B1-K175', H:1750, Hmin:1750, Hmax:1750, W:450, Wmin:450, Wmax:450, D:520, tall:true, pantry:true, trays:5, tg:{set:'1700–1950 mm', frame:['90007481', '5 kiler çerçevesi 500 mm']}}, // 175 cm: VS TAL Gate 1700–1950 mm seti, 5 Planero sepet (makroaks.com.tr ürün listesi)
-  b1w:{cat:'b1', label:'B1 - Çamaşır', short:'B1-Ç', H:1500, Hmin:1250, Hmax:1800, Hopts:[1250, 1300, 1400, 1500, 1600, 1700, 1800], W:450, Wmin:300, Wmax:600, Wopts:[300, 400, 450, 600], D:520, tall:true, wash:true} // ÇAMAŞIR SEPETLİ BOY DOLAP (2026-10-09): altta Vauth-Sagel ENVI Space XX Pro raylı çamaşır sepeti (çekmece kapak), arada gola, üstte raflı menteşeli kapak; derinlik 52 SABİT
+  b1k150:{cat:'b1', label:'B1 - Kiler 150', short:'B1-K150', H:1500, Hmin:1500, Hmax:1500, W:450, Wmin:450, Wmax:450, D:565, tall:true, pantry:true, trays:4, tg:{set:'1450–1700 mm', frame:['90006622', '4 kiler çerçevesi 400/450 mm']}}, // KİLER MEKANİZMALI BOY DOLAP (2026-10-09): en 45 / derinlik 56,5 (arkalık 25 mm içeride, kullanıcı kararı) / boy SABİT; Vauth-Sagel VS TAL Gate Planero Lava, 4 sepet
+  b1k175:{cat:'b1', label:'B1 - Kiler 175', short:'B1-K175', H:1750, Hmin:1750, Hmax:1750, W:450, Wmin:450, Wmax:450, D:565, tall:true, pantry:true, trays:5, tg:{set:'1700–1950 mm', frame:['90007481', '5 kiler çerçevesi 500 mm']}}, // 175 cm: VS TAL Gate 1700–1950 mm seti, 5 Planero sepet (makroaks.com.tr ürün listesi)
+  b1w:{cat:'b1', label:'B1 - Çamaşır', short:'B1-Ç', H:1500, Hmin:1250, Hmax:1800, Hopts:[1250, 1300, 1400, 1500, 1600, 1700, 1800], W:450, Wmin:300, Wmax:600, Wopts:[300, 400, 450, 600], D:565, tall:true, wash:true} // ÇAMAŞIR SEPETLİ BOY DOLAP (2026-10-09): altta Vauth-Sagel ENVI Space XX Pro raylı çamaşır sepeti (çekmece kapak), arada gola, üstte raflı menteşeli kapak; derinlik 56,5 SABİT (arkalık 25 mm içeride; kullanıcı kararı)
 };
 const isTall = m => !!(TYPES[m.type] && TYPES[m.type].tall);
 const TALL_SPLIT = .5; // iki kapak eşit yükseklikte (kapak arası boşluk gövde ortasında)
@@ -381,6 +381,11 @@ const ELCIK = {d:60, dIn:90, h:300, hIn:360, lip:2, ch:12, y:850}; // kapağa OY
 /* oyuk merkezi (dünya y): yerden 850, kapağın içinde kalacak kadar kırpılır (uçlardan en az 20 mm) */
 const elcikC = (y0, y1) => clamp(ELCIK.y, y0 + ELCIK.hIn/2 + 20, y1 - ELCIK.hIn/2 - 20);
 const TALL_GAP = 100; // boy dolabın yanındaki boşluk (tezgahlı modülle ve iki boy dolap arası, mm)
+/* BOY DOLAP ARKALIĞI (kullanıcının üstten çizimi, 2026-10-09): arkalık (kaplamada 9, lam / lake’de 8 mm) yan dikmelerdeki kanala, ARKA YÜZÜ ARKA KENARDAN HEP 25 mm İÇERİDE oturur
+   (arkada duvar / tesisat boşluğu); raflar, iç çekmeceler, kiler ve çamaşır mekanizması arkalığın önünden (TALL_BACK) başlar */
+const TALL_BACK_IN = 25; // arkalığın ARKA yüzü yan dikmenin arka kenarından hep 25 mm içeride
+const backT = mat => (MATS[mat] && MATS[mat].key === 'kaplama') ? 9 : 8; // ARKALIK KALINLIĞI (kullanıcı 2026-10-09): kaplamada 9, lam / lake'de 8 mm (tüm modüller)
+const TALL_BACK = (c = cfg) => TALL_BACK_IN + backT(c.body.mat); // boy dolapta arkalığın ön yüzü (iç parçalar buradan başlar)
 const onBase = m => !!TYPES[m.type].base; // 10 cm bazalı, yere basan
 /* tezgah isteğe bağlı (c.top.on, varsayılan açık); yoksa kalınlığı 0 sayılır: dolap üstü tezgah üstü yerine geçer */
 const hasTop = (c = cfg) => c.top.on !== false;
@@ -503,13 +508,13 @@ const MATS = {
     {id:'karaagac', name:'Karaağaç', hex:'#a17d5b', dk:'#715032'},
     {id:'zebrano', name:'Zebrano', hex:'#c9a978', dk:'#5f4429', stripe:true}
   ]},
-  lam:{label:'MDF Lam', t:18, back:'MDF Lam 9 mm', key:'lam', colors:[ // DCS-G dokulu lam (görselden tekrarlanan desen)
+  lam:{label:'MDF Lam', t:18, back:'MDF Lam 8 mm', key:'lam', colors:[ // DCS-G dokulu lam (görselden tekrarlanan desen)
     {id:'dcsgb', name:'DCS-G-B', hex:'#f4f4f2', img:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAF8AAABhCAYAAACwPH0oAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAADwSURBVHhe7dChEcAwDMDApvuv7HN5B4jIPxTUmZl9SJzdNT/y/gP3mB8yP2R+yPyQ+SHzQ+aHzA+ZHzI/ZH7I/JD5IfND5ofMD5kfMj9kfsj8kPkh80Pmh8wPmR8yP2R+yPyQ+SHzQ+aHzA+ZHzI/ZH7I/JD5IfND5ofMD5kfMj9kfsj8kPkh80Pmh8wPmR8yP2R+yPyQ+SHzQ+aHzA+ZHzI/ZH7I/JD5IfND5ofMD5kfMj9kfsj8kPkh80Pmh8wPmR8yP2R+yPyQ+SHzQ+aHzA+ZHzI/ZH7I/JD5IfND5ofMD5kfMj9kfsj8kPkh80Mf+70Is/TGgkUAAAAASUVORK5CYII='},
     {id:'dcsgcb', name:'DCS-G-ÇB', hex:'#9e988f', tint:.81, img:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFkAAABcCAYAAAAFxhkcAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAADmSURBVHhe7dChAYAwAMCwsf+PmUdyGPPTUJXIyl7Pvd7Br+YZ+J7JAZMDJgdMDpgcMDlgcsDkgMkBkwMmB0wOmBwwOWBywOSAyQGTAyYHTA6YHDA5YHLA5IDJAZMDJgdMDpgcMDlgcsDkgMkBkwMmB0wOmBwwOWBywOSAyQGTAyYHTA6YHDA5YHLA5IDJAZMDJgdMDpgcMDlgcsDkgMkBkwMmB0wOmBwwOWBywOSAyQGTAyYHTA6YHDA5YHLA5IDJAZMDJgdMDpgcMDlgcsDkgMkBkwMmB0wOmBwwOWBywOSAyQGTAxsfTQPlV49qpgAAAABJRU5ErkJggg=='},
     {id:'dcsgt', name:'DCS-G-T', hex:'#8f8e8b', tint:.81, img:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFkAAABbCAYAAAAYwymkAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAADjSURBVHhe7dChAYAwAMCwsf8/mYAPmZ+GqkRW9nru9Q5+Nc/A90wOmBwwOWBywOSAyQGTAyYHTA6YHDA5YHLA5IDJAZMDJgdMDpgcMDlgcsDkgMkBkwMmB0wOmBwwOWBywOSAyQGTAyYHTA6YHDA5YHLA5IDJAZMDJgdMDpgcMDlgcsDkgMkBkwMmB0wOmBwwOWBywOSAyQGTAyYHTA6YHDA5YHLA5IDJAZMDJgdMDpgcMDlgcsDkgMkBkwMmB0wOmBwwOWBywOSAyQGTAyYHTA6YHDA5YHLA5IDJAZMDJgdMDmzXSgO/1J7d+wAAAABJRU5ErkJggg=='},
     {id:'dcsgs', name:'DCS-G-S', hex:'#151515', img:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFkAAABaCAYAAADTn/oBAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAADgSURBVHhe7dChAcAgEMBAyg6//6itr4aoOxmZZ2bexVX7HzjP5IDJAZMDJgdMDpgcMDlgcsDkgMkBkwMmB0wOmBwwOWBywOSAyQGTAyYHTA6YHDA5YHLA5IDJAZMDJgdMDpgcMDlgcsDkgMkBkwMmB0wOmBwwOWBywOSAyQGTAyYHTA6YHDA5YHLA5IDJAZMDJgdMDpgcMDlgcsDkgMkBkwMmB0wOmBwwOWBywOSAyQGTAyYHTA6YHDA5YHLA5IDJAZMDJgdMDpgcMDlgcsDkgMkBkwMmB0wOmBwwOWBy4AOL8AHy8puvHAAAAABJRU5ErkJggg=='}
   ]},
-  lake:{label:'Lake', t:18, back:'MDF Lake 9 mm', key:'lake', colors:[
+  lake:{label:'Lake', t:18, back:'MDF Lake 8 mm', key:'lake', colors:[
     {id:'dcs02', name:'DCS02', hex:'#c3bbb0'},
     {id:'dcstn184', name:'DCSTN184', hex:'#a59a8e'},
     {id:'dcsn27', name:'DCSN27', hex:'#504c48'},
@@ -981,9 +986,9 @@ function cutList(c = cfg){
   // tek gövdeli boy dolap (B1, elcikli B2): ayarlı raflar + iç çekmeceler (3B ile ortak: tallInterior); ayarlı raf adedini döndürür
   const tallIdrParts = (m, mod, W, cdt) => {
     const ti = tallInterior(m, c), nSh = ti.spans.reduce((a, s) => a + s[2], 0), LW = W - 2*T;
-    push('Ayarlı raf', mod, nSh, LW - 2, cdt - 29, T, bName, bKey);
+    push('Ayarlı raf', mod, nSh, LW - 2, cdt - TALL_BACK(c) - 20, T, bName, bKey);
     if (!ti.rows.length) return nSh;
-    push('İç çekmece üstü sabit raf', mod, 1, LW, cdt - 29, T, bName, bKey, `${ti.rows.length} iç çekmecenin üstünde`);
+    push('İç çekmece üstü sabit raf', mod, 1, LW, cdt - TALL_BACK(c) - 20, T, bName, bKey, `${ti.rows.length} iç çekmecenin üstünde`);
     ti.rows.forEach((r, k) => {
       const bs = r.k, gal = IDR[bs].gallery;
       push(`İç çekmece tabanı ${k+1}`, mod, 1, LW - 35, IDR_NL - 40, T, bName, bKey, `LEGRABOX tabanı (iç çekmece ${bs})`);
@@ -998,7 +1003,7 @@ function cutList(c = cfg){
       const Dt = TYPES[m.type].D, cdt = Dt - fT, nSh = tallIdrParts(m, mod, W, cdt), dH = H - 3, DW = (doorFit(m).dw - 3)/2;
       push('Yan dikme', mod, 2, H, cdt, T, bName, bKey, 'Boy dolap (elcikli, tek gövde)');
       push('Alt / üst tabla', mod, 2, W - 2*T, cdt, T, bName, bKey);
-      push('Arkalık', mod, 1, W - 2*T + 10, H - 2*T + 10, 9, bBack, b9);
+      push('Arkalık', mod, 1, W - 2*T + 10, H - 2*T + 10, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, arka kenardan ${TALL_BACK_IN} mm içeride`);
       const st = ' · Düz kapak (elcikli modülde kapak tipi her zaman düz)' + (fGrain('dikey') ? ' · ' + fGrain('dikey') : '');
       const by = moduleDims(m, c).bottomY, ecY = Math.round(elcikC(by + 1.5, by + H - 1.5));
       const ce = ELCIK.lip + ELCIK.ch, ekT = Math.max(1, fT - ce);
@@ -1021,8 +1026,8 @@ function cutList(c = cfg){
       push('Yan dikme (dış)', mod, 2, H, cdt, T, bName, bKey, `Boy dolap · 2 gövde × ${bw2} mm`);
       push('Yan dikme (iç)', mod, 2, H, cdt, T, bName, bKey, 'iki gövdenin birleşimi' + (gola ? ` · gola kertiği ${GOLA_D} mm, boy boyunca` : ''));
       push('Alt / üst tabla', mod, 4, bw2 - 2*T, cdt, T, bName, bKey, gola ? `iç uçta${gk}` : '');
-      push('Ayarlı raf', mod, 2*nSh, bw2 - 2*T - 2, cdt - 9 - (gola ? GOLA_D + 4 : 20), T, bName, bKey);
-      push('Arkalık', mod, 2, bw2 - 2*T + 10, H - 2*T + 10, 9, bBack, b9);
+      push('Ayarlı raf', mod, 2*nSh, bw2 - 2*T - 2, cdt - TALL_BACK(c) - (gola ? GOLA_D + 4 : 20), T, bName, bKey);
+      push('Arkalık', mod, 2, bw2 - 2*T + 10, H - 2*T + 10, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, arka kenardan ${TALL_BACK_IN} mm içeride`);
       const st = (c.front.style !== 'duz' ? ' · ' + frontStyleText(c.front) : '') + (fGrain('dikey') ? ' · ' + fGrain('dikey') : '');
       push('Kapak (sol)', mod, 1, dH, DW, fT, fName, fKey, 'menteşe sol' + st);
       push('Kapak (sağ)', mod, 1, dH, DW, fT, fName, fKey, 'menteşe sağ' + st);
@@ -1040,9 +1045,9 @@ function cutList(c = cfg){
       const dLo = split - gap - 1.5, dUp = H - split - gap - 1.5, dOne = H - 3, side = m.hinge === 'L' ? 'sol' : 'sağ';
       push('Yan dikme', mod, 2, H, cdt, T, bName, bKey, tallPantry(m) ? 'Kiler boy dolap · VS TAL Gate ray bağlantısı' : gola ? `Gola kertiği ${GOLA_D} mm · alttan ${split} mm` : 'Boy dolap');
       push('Alt / üst tabla', mod, 2, W - 2*T, cdt, T, bName, bKey);
-      if (!tallPantry(m) && tallInterior(m, c).fixed.some(f => f.mid)) push('Sabit orta raf', mod, 1, W - 2*T, cdt - 9 - (gola ? GOLA_D + 4 : 20), T, bName, bKey, gola ? 'Gola profilinin arkasında' : '');
+      if (!tallPantry(m) && tallInterior(m, c).fixed.some(f => f.mid)) push('Sabit orta raf', mod, 1, W - 2*T, cdt - TALL_BACK(c) - (gola ? GOLA_D + 4 : 20), T, bName, bKey, gola ? 'Gola profilinin arkasında' : '');
       const nSh = tallPantry(m) ? 0 : tallIdrParts(m, mod, W, cdt); // kilerde raf yok
-      push('Arkalık', mod, 1, W - 2*T + 10, H - 2*T + 10, 9, bBack, b9);
+      push('Arkalık', mod, 1, W - 2*T + 10, H - 2*T + 10, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, arka kenardan ${TALL_BACK_IN} mm içeride`);
       const fNote = `menteşe ${side}` + (c.front.style !== 'duz' ? ' · ' + frontStyleText(c.front) : '') + (fGrain('dikey') ? ' · ' + fGrain('dikey') : '');
       const DW = doorFit(m).dw; // kapama tarafından 3, diğer taraftan 1,5 mm pay
       if (one){ push('Kapak (tek)', mod, 1, dOne, DW, fT, fName, fKey, fNote); trimRows('Kapak (tek) çıtası', mod, DW, dOne, th); }
@@ -1075,7 +1080,7 @@ function cutList(c = cfg){
       push('Arka üst kayıt (dikey)', mod, 1, W - 2*T, 80, T, bName, bKey, 'Lavabo modülü · arkalığa dik');
       hw.push({item:`Alüminyum ön bağlantı profili 8×50 mm · boy ${W - 2*T} mm (evye tipi)`, mod, qty:1, price:PRICE.aluProfile});
     } else push('Üst kayıt', mod, 2, W - 2*T, 100, T, bName, bKey);
-    push('Arkalık', mod, 1, W - 2*T + 10, H - T, 9, bBack, b9);
+    push('Arkalık', mod, 1, W - 2*T + 10, H - T, backT(c.body.mat), bBack, b9);
     if (onBase(m)) hw.push({item:'Ayarlı baza ayağı', mod, qty:4, price:PRICE.plinth/4}); // baza paneli m² ile, ayaklar burada
     else hw.push({item:'Gizli askı mekanizması', mod, qty:2, price:0});
     hs.forEach((h,k) => {
@@ -1678,7 +1683,7 @@ function buildModule(m, x0, idx, mx){
   carve(T, H, cd, bm, x0 + T/2, bottomY + H/2, cd/2, g, golaCut);
   carve(T, H, cd, bm, x0 + W - T/2, bottomY + H/2, cd/2, g, golaCut);
   box(W - 2*T, T, cd, bm, cx, bottomY + T/2, cd/2, g);
-  box(W - 2*T, H - T, 9, bm, cx, bottomY + T + (H - T)/2, 4.5, g);
+  box(W - 2*T, H - T, backT(c.body.mat), bm, cx, bottomY + T + (H - T)/2, backT(c.body.mat)/2, g); // arkalık: kaplamada 9, lam / lake'de 8 mm
   if (onBase(m)){ // bazalı modül: gövdenin altında 4 adet PLASTİK AYARLI BAZA AYAĞI (kullanıcı 2026-10-09; parça listesinde "Ayarlı baza ayağı" × 4)
     // yerde Ø50 taban, dişli Ø22 gövde, üstte Ø44 gövdeye oturan tabla; yanlardan 60 mm, önde bazanın arkasında, arkada arkalıktan 60 mm
     const lm = std('plinthLeg', () => new THREE.MeshStandardMaterial({color: srgb('#2b2c2e'), roughness: .62, metalness: 0}));
@@ -1857,7 +1862,7 @@ function buildWash(fixed, moving, b, W){
   const mdl = WASH[washModel(W)], dark = M.lgb, rim = M.washR || (M.washR = new THREE.MeshStandardMaterial({color: srgb('#2e3032'), metalness: .05, roughness: .6}));
   const P = (w, h, d, mat, x, y, z, par) => { if (w <= 0 || h <= 0 || d <= 0) return null; const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; par.add(m); return m; }; // çizgisiz küçük parça
   const fill = (W - washModel(W))/2 > 10 ? (W - washModel(W))/2 : 0;                                                     // model dolaptan darsa iki yanda dolgu (35: 300'lük, 50: 450'lik → 25 mm)
-  const xL = b.xL + fill, xR = b.xR - fill, cx = (xL + xR)/2, iw = xR - xL, z1 = b.z1 - 2, depth = Math.min(z1 - b.z0 - 4, 490), z0 = z1 - depth, zc = z1 - depth/2;
+  const xL = b.xL + fill, xR = b.xR - fill, cx = (xL + xR)/2, iw = xR - xL, z1 = b.z1 - 2, depth = Math.min(z1 - b.z0 - 4, 515), z0 = z1 - depth, zc = z1 - depth/2;
   if (fill) [b.xL + fill/2, b.xR - fill/2].forEach(x => box(fill, b.y1 - b.y0, depth, b.bm || dark, x, (b.y0 + b.y1)/2, zc, fixed)); // dolgu (gövde malzemesi)
   // yandan sırayla (duvardan içeri, ürün gibi dar): sabit ray 10, kayan ray 3, taşıyıcı levhası 2 mm → sepet ağzı duvardan en az ~20 mm içeride
   const RW = 10, ry = b.y0 + 45, xin = RW + 5;                                                        // ray: yan yüzde, alttan 45 mm
@@ -1875,15 +1880,15 @@ function buildWash(fixed, moving, b, W){
   P(iw - 2*xin, 2, depth - 20, dark, cx, by0 - 3, zc, moving);                                       // taban levhası
   [z1 - 5, z0 + 5].forEach(z => P(iw - 2*xin + 4, 8, 8, dark, cx, top - 14, z, moving));            // ağız çerçevesi ön / arka kayıt (sepetlerin önünde / arkasında)
   // sepetler: alta doğru daralan, delikli (gerçek delik, alfa), ağızda kenar ve taşıma sapı; gerçek ölçüde, sığmazsa ölçeklenir
-  const n = mdl.bins.length, alongZ = mdl.row === 'z', gap = 8, roomX = iw - 2*xin - 12, roomZ = depth - 28;
+  const n = mdl.bins.length, alongZ = mdl.row === 'z', gap = 8, roomX = iw - 2*xin - 12, roomZ = depth - 20;
   const sum = mdl.bins.reduce((a, q) => a + (alongZ ? q[1] : q[0]), 0), sc = Math.min(1, ((alongZ ? roomZ : roomX) - (n - 1)*gap)/sum), tot = sum*sc + (n - 1)*gap;
   let acc = 0, dMax = 0;
   mdl.bins.forEach(([w0, d0]) => {
     const w = alongZ ? Math.min(w0, roomX) : w0*sc, d = alongZ ? d0*sc : Math.min(d0, roomZ);
-    const bx = alongZ ? cx : cx - tot/2 + acc + w/2, bz = alongZ ? z1 - 14 - acc - d/2 : z1 - 14 - d/2; acc += (alongZ ? d : w) + gap; dMax = Math.max(dMax, d);
+    const bx = alongZ ? cx : cx - tot/2 + acc + w/2, bz = alongZ ? z1 - 10 - acc - d/2 : z1 - 10 - d/2; acc += (alongZ ? d : w) + gap; dMax = Math.max(dMax, d);
     washBin(moving, w, d, bh, bx, by0, bz, rim);
   });
-  if (mdl.extra){ const [ew, ed, eh] = mdl.extra, zb = z1 - 14 - dMax - gap; if (zb - ed >= z0 + 10) P(Math.min(ew, roomX), eh, ed, rim, cx, top - eh/2 - 2, zb - ed/2, moving); } // 300'lük: sepetin arkasında küçük ek kutu (2 lt)
+  if (mdl.extra){ const [ew, ed, eh] = mdl.extra, zb = z1 - 10 - dMax - gap; if (zb - ed >= z0 + 10) P(Math.min(ew, roomX), eh, ed, rim, cx, top - eh/2 - 2, zb - ed/2, moving); } // 300'lük: sepetin arkasında küçük ek kutu (2 lt)
   const cy = Math.min(b.y1 - 6, top + 24);                                                          // SÜRGÜLÜ ÜST KAPAK: gövdede kalır (kendi raylarında)
   P(iw - 4, 10, depth - 6, dark, cx, cy, zc, fixed);
   [-1, 1].forEach(sx => P(RW, 20, depth - 20, dark, cx + sx*(iw/2 - RW/2), cy - 15, zc, fixed));
@@ -1917,26 +1922,26 @@ function buildTall(m, x0, idx, mx){
   const g = new THREE.Group(); g.userData.mod = m.uid; root.add(g);
   const bm = panelMat(c.body.mat, c.body.color), fm = panelMat(c.front.mat, c.front.color, c.front.fin);
   const one = tallOne(m), th = tallHandleOf(m, c), gola = th === 'kanal', split = bottomY + tallSplit(m, H); // boy dolabın kendi tutamak seçimi (tek kapakta gola yok)
-  const pair = tallPair(m), sd = cd - 9 - (gola ? GOLA_D + 4 : 20);
+  const pair = tallPair(m), sd = cd - TALL_BACK(c) - (gola ? GOLA_D + 4 : 20);
   if (pair && tallElcik(m)){
     // B2 elcikli: TEK gövde (tam genişlik), sabit orta raf yok, ayarlı raflar pairShelves(H)
     carve(T, H, cd, bm, x0 + T/2, bottomY + H/2, cd/2, g, []);
     carve(T, H, cd, bm, x0 + W - T/2, bottomY + H/2, cd/2, g, []);
     box(W - 2*T, T, cd, bm, cx, bottomY + T/2, cd/2, g);
     box(W - 2*T, T, cd, bm, cx, top - T/2, cd/2, g);
-    box(W - 2*T, H - 2*T, 9, bm, cx, bottomY + H/2, 4.5, g); // raflar ve iç çekmeceler aşağıda (tallInterior)
+    box(W - 2*T, H - 2*T, backT(c.body.mat), bm, cx, bottomY + H/2, TALL_BACK_IN + backT(c.body.mat)/2, g); // raflar ve iç çekmeceler aşağıda (tallInterior)
   } else if (pair){
     // B2: iki ayrı gövde (her biri W/2); gola ise birleşimde dikey C profil, iç yanlar ile alt/üst tablaların ön kenarı boy boyunca kertilir
     const hw = W/2, seam = x0 + hw, vCut = gola ? [{x0: seam - C_H/2, x1: seam + C_H/2, z0: cd - GOLA_D, z1: cd + 1, y0: bottomY - 1, y1: top + 1}] : [];
-    const shD = cd - 9 - (gola ? GOLA_D + 4 : 20), nSh = pairShelves(H);
+    const shD = cd - TALL_BACK(c) - (gola ? GOLA_D + 4 : 20), nSh = pairShelves(H);
     [x0, seam].forEach(bx => {
       const bc = bx + hw/2;
       carve(T, H, cd, bm, bx + T/2, bottomY + H/2, cd/2, g, vCut);
       carve(T, H, cd, bm, bx + hw - T/2, bottomY + H/2, cd/2, g, vCut);
       carve(hw - 2*T, T, cd, bm, bc, bottomY + T/2, cd/2, g, vCut);
       carve(hw - 2*T, T, cd, bm, bc, top - T/2, cd/2, g, vCut);
-      box(hw - 2*T, H - 2*T, 9, bm, bc, bottomY + H/2, 4.5, g);
-      shelfYs(T, H - T, nSh, T).forEach(ay => box(hw - 2*T - 2, T, shD, bm, bc, bottomY + ay, 9 + shD/2, g)); // net aralar eşit
+      box(hw - 2*T, H - 2*T, backT(c.body.mat), bm, bc, bottomY + H/2, TALL_BACK_IN + backT(c.body.mat)/2, g);
+      shelfYs(T, H - T, nSh, T).forEach(ay => box(hw - 2*T - 2, T, shD, bm, bc, bottomY + ay, TALL_BACK(c) + shD/2, g)); // net aralar eşit
     });
     if (gola){ // dikey C profil 74×26, gövde boyunda, iki kapak arasındaki 30 mm boşluğa ortalı
       const jm = m.kanalFin === 'front' ? fm : M.dark, dz = GOLA_D - 2, yc = bottomY + H/2;
@@ -1950,22 +1955,22 @@ function buildTall(m, x0, idx, mx){
   carve(T, H, cd, bm, x0 + W - T/2, bottomY + H/2, cd/2, g, golaCut);
   box(W - 2*T, T, cd, bm, cx, bottomY + T/2, cd/2, g);
   box(W - 2*T, T, cd, bm, cx, top - T/2, cd/2, g);
-  box(W - 2*T, H - 2*T, 9, bm, cx, bottomY + H/2, 4.5, g);
+  box(W - 2*T, H - 2*T, backT(c.body.mat), bm, cx, bottomY + H/2, TALL_BACK_IN + backT(c.body.mat)/2, g);
   }
   // tek gövdeli boy dolap (B1, elcikli B2): raflar ve iç çekmeceler — parça listesiyle ortak hesap (tallInterior)
   // sabit orta raf gola profilinin arkasında biter; ayarlı raflar ve çekmece üstü sabit raf kapaktan 20 mm geride
   const idrGs = [], doorGs = []; let tGate = null; // tGate: kilerin VS TAL Gate çerçevesi (kapak hareketinin hemen ardından güncellenir)
   if (tallPantry(m)){ // B1 Kiler: raf yok; içinde VS TAL Gate — çerçeve kapağa follower kollarıyla bağlı, kapakla AYNI ANDA açılır / kapanır
     const dfp = doorFit(m), Rh = m.hinge !== 'L';
-    tGate = buildTalGate(g, {xL: x0 + T, xR: x0 + W - T, y0: bottomY + T, y1: top - T, z0: 9, z1: cd}, // tepsiler kapak açısına bağlı: kapakla birlikte, bekleme yok
+    tGate = buildTalGate(g, {xL: x0 + T, xR: x0 + W - T, y0: bottomY + T, y1: top - T, z0: TALL_BACK(c), z1: cd}, // tepsiler kapak açısına bağlı: kapakla birlikte, bekleme yok
       {key: m.uid + ':tg', n: TYPES[m.type].trays, door: () => doorGs[0], hx: Rh ? x0 + W - dfp.r : x0 + dfp.l, s: Rh ? -1 : 1, dw: dfp.dw, fT});
   } else if (!pair || tallElcik(m)){
-    const ti = tallInterior(m, c), shD = cd - 29;
-    ti.fixed.forEach(f => f.mid ? box(W - 2*T, T, sd, bm, cx, bottomY + f.y, 9 + sd/2, g) : box(W - 2*T, T, shD, bm, cx, bottomY + f.y, 9 + shD/2, g));
-    ti.adj.forEach(ay => box(W - 2*T - 2, T, shD, bm, cx, bottomY + ay, 9 + shD/2, g)); // ayarlı raflar: net aralar eşit
+    const ti = tallInterior(m, c), shD = cd - TALL_BACK(c) - 20;
+    ti.fixed.forEach(f => f.mid ? box(W - 2*T, T, sd, bm, cx, bottomY + f.y, TALL_BACK(c) + sd/2, g) : box(W - 2*T, T, shD, bm, cx, bottomY + f.y, TALL_BACK(c) + shD/2, g));
+    ti.adj.forEach(ay => box(W - 2*T - 2, T, shD, bm, cx, bottomY + ay, TALL_BACK(c) + shD/2, g)); // ayarlı raflar: net aralar eşit
     // iç çekmece: LEGRABOX, NL 270, yanlar M; M'de 98 mm, C'de 185 mm metal iç ön panel (kulpsuz, rayı örter);
     // C'de arkalık C yüksekliğinde ve yanların üstünde önden arkaya galeri rayı (Blum "front piece with gallery"). Kapaklar ~70° açılınca kayar, kapanırken önce çekmeceler girer
-    const z1 = cd - 30, z0 = z1 - IDR_NL, BT = matT(c.body.mat), S = LGB.side;
+    const z1 = Math.max(cd - 30, TALL_BACK(c) + 2 + IDR_NL), z0 = z1 - IDR_NL, BT = matT(c.body.mat), S = LGB.side;
     ti.rows.forEach((r, k) => {
       const ig = new THREE.Group(), yb = bottomY + r.yb, dist = 230 - k*20, gal = IDR[r.k].gallery, bh = r.bh; g.add(ig);
       drawerBox(ig, {x0: x0 + T + 13, x1: x0 + W - T - 13, yb, hb: r.sh, lgb: ['M', r.sh], bh, z0, z1}); // yan rayın üstünde, ön panelle (anma ölçüsü) sıfır
@@ -2057,8 +2062,8 @@ function buildTall(m, x0, idx, mx){
     doorGs.push(dg);
     if (d.pull){ // B1 Çamaşır alt kapağı: menteşesiz, çekmece gibi DÜZ ÖNE çekilir; ENVI Space XX Pro taşıyıcısı ve sepetler kapakla birlikte gelir, sürgülü üst kapak gövdede kalır
       const mv = new THREE.Group(); mv.position.set(-px, 0, -(cd + fT)); dg.add(mv);
-      buildWash(g, mv, {xL: x0 + T, xR: x0 + W - T, y0: bottomY + T, y1: split - T/2, z0: 9, z1: cd, bm}, W);
-      const z0d = cd + fT, dist = Math.round((cd - 9)*.85);                                         // tam açılım (sepet derinliğinin büyük kısmı dışarı)
+      buildWash(g, mv, {xL: x0 + T, xR: x0 + W - T, y0: bottomY + T, y1: split - T/2, z0: TALL_BACK(c), z1: cd, bm}, W);
+      const z0d = cd + fT, dist = Math.round((cd - TALL_BACK(c))*.85);                                         // tam açılım (sepet derinliğinin büyük kısmı dışarı)
       dg.userData.update = () => { const goal = z0d + (ui.openSet.has(m.uid) ? dist : 0); [dg.position.z, dg.userData.v] = spring(dg.position.z, goal, dg.userData.v || 0, .05); };
     } else
     dg.userData.update = () => { const goal = dg.userData.target()*open, r = dg.rotation.y; [dg.rotation.y, dg.userData.v] = spring(r, goal, dg.userData.v || 0, 1e-4); };
@@ -2747,7 +2752,7 @@ function renderLeft(){
   let body = '';
   if (tab === 'modul'){
     const types = Object.entries(TYPES).filter(([, v]) => v.cat === lt);
-    const hint = lt === 'b1' ? 'Duvara asılı boy dolap; yükseklik 120–180 cm (10 cm adım) ve genişlik 30–50 cm modülün panelinden ayarlanır, derinlik 35 cm. İki eşit kapak (arada gola) ya da tek kapak (gola yerine push-open). Kiler 150 ve Kiler 175: tek kapak, en 45 · derinlik 52 cm sabit, içinde Vauth-Sagel VS TAL Gate Planero (antrasit) kiler mekanizması (150: 4 sepet, 175: 5 sepet), kapakla birlikte açılır. Çamaşır: altta Vauth-Sagel ENVI Space XX Pro raylı çamaşır sepeti (çekmece gibi açılır), arada gola, üstte raflı kapak; genişlik 30 / 40 / 45 / 60 (her biri kendi ENVI modeli), yükseklik 125–180 cm, derinlik 52 cm. Dizilimin ucunda, tezgahın yanında durur.'
+    const hint = lt === 'b1' ? 'Duvara asılı boy dolap; yükseklik 120–180 cm (10 cm adım) ve genişlik 30–50 cm modülün panelinden ayarlanır, derinlik 35 cm. İki eşit kapak (arada gola) ya da tek kapak (gola yerine push-open). Kiler 150 ve Kiler 175: tek kapak, en 45 · derinlik 56,5 cm sabit, içinde Vauth-Sagel VS TAL Gate Planero (antrasit) kiler mekanizması (150: 4 sepet, 175: 5 sepet), kapakla birlikte açılır. Çamaşır: altta Vauth-Sagel ENVI Space XX Pro raylı çamaşır sepeti (çekmece gibi açılır), arada gola, üstte raflı kapak; genişlik 30 / 40 / 45 / 60 (her biri kendi ENVI modeli), yükseklik 125–180 cm, derinlik 56,5 cm. Dizilimin ucunda, tezgahın yanında durur.'
       : lt === 'b2' ? 'Duvara asılı çift kapaklı boy dolap; yükseklik 80–180 cm (10 cm adım) ve genişlik 60–100 cm (10 cm adım) modülün panelinden ayarlanır, derinlik 35 cm. İki ayrı gövde (her biri genişliğin yarısı), yan yana iki kapak (sol kapak soldan, sağ kapak sağdan menteşeli); iki model: Çift kapak (ortada dikey gola, kapak arası 30 mm, profil alüminyum ya da ahşap) ve Elcikli (tek gövde, 120–180 cm, elcik sol ya da sağ kapağın birleşim kenarında oyuk, kapak arası 3 mm).. Dizilimin ucunda, tezgahın yanında durur.'
       : lt === 'c3' ? 'Bazalı; yükseklik yerden tezgah altına, 10 cm baza dahil. Tezgah modülün üstüne oturur.' : 'Askı; tezgahın altına asılır.';
     body = `<div class="seg">${Object.entries(CATS).map(([k, v]) => `<button data-act="libtype" data-v="${k}" aria-pressed="${lt === k}" title="${v}">${v.split(' - ')[0]}</button>`).join('')}</div>
@@ -2891,13 +2896,13 @@ function renderRight(){
     else if (!m) body = `<p class="hint">3B görünümde bir modüle tıklayın (Ctrl/Shift ile çoklu seçim) veya alttaki M etiketlerinden birine tıklayın. Sağ tık basılı sürükleme döndürür, sol tık basılı sürükleme kaydırır, tekerlek yakınlaştırır. Yeni modül için soldaki Modül sekmesini kullanın.</p>`;
     else if (isTall(m)){
       const {H, bottomY} = moduleDims(m), Tt = TYPES[m.type];
-      body = `<div class="row sp"><h3 class="ttl">M${i+1} · ${Tt.label}</h3><span class="tag">${m.width/10}×${H/10}×${Tt.D/10}</span></div>
+      body = `<div class="row sp"><h3 class="ttl">M${i+1} · ${Tt.label}</h3><span class="tag">${m.width/10}×${H/10}×${String(Tt.D/10).replace(".", ",")}</span></div>
       <p class="hint" style="margin:-8px 0 0">Duvara asılı boy dolap · ${tallPair(m) ? (tallElcik(m) ? 'yan yana iki kapak (sol / sağ menteşe), ' : 'iki gövde, yan yana iki kapak (sol / sağ menteşe), ') + (tallElcik(m) ? 'tek gövde, elcik ' + (m.elcikSide === 'R' ? 'sağ' : 'sol') + ' kapakta' : 'ortada dikey gola') : tallWash(m) ? 'altta çamaşır sepeti çekmecesi (Vauth-Sagel ENVI Space XX Pro), arada gola, üstte raflı kapak' : tallPantry(m) ? 'kiler: tek kapak, içinde Vauth-Sagel VS TAL Gate Planero (' + TYPES[m.type].trays + ' sepet, kapakla birlikte açılır)' : tallOne(m) ? 'tek kapak' : 'iki kapak' + (m.handle === 'kanal' ? ', arada gola' : '')} · tezgahın yanında durur</p>
       <div>
       <div class="field"><label for="m-type">Modül</label><select id="m-type" data-m="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${m.type === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></div>
       ${Tt.Wopts ? `<div class="lbl" style="margin-bottom:6px">Genişlik</div><div class="seg" style="margin-bottom:10px">${Tt.Wopts.map(v => `<button data-act="mset" data-k="width" data-v="${v}" aria-pressed="${m.width === v}">${v/10} cm</button>`).join('')}</div>`
-        + (Tt.wash ? `<p class="hint" style="margin:-4px 0 10px">Derinlik ${Tt.D/10} cm (sabit) · Vauth-Sagel ENVI Space XX Pro ${WASH[washModel(m.width)].name.replace('RAYLI ÇAMAŞIR SEPETİ ', '').toLowerCase()} (${WASH[washModel(m.width)].code})${m.width > washModel(m.width) + 20 ? ` · iki yanda ${(m.width - washModel(m.width))/2} mm dolgu` : ''}</p>` : '')
-        : Tt.Wmin === Tt.Wmax ? `<p class="hint" style="margin:0 0 10px">Genişlik ${Tt.W/10} cm · derinlik ${Tt.D/10} cm${Tt.Hmin === Tt.Hmax ? ` · yükseklik ${Tt.H/10} cm` : ''} (sabit)${Tt.pantry ? ` · Vauth-Sagel VS TAL Gate ${Tt.tg.set}, ${Tt.trays} Planero sepet` : ''}</p>` : wField('m-width', 'm', m.width, Tt.Wmin, Tt.Wmax, Tt.Wstep || W_STEP)}
+        + (Tt.wash ? `<p class="hint" style="margin:-4px 0 10px">Derinlik ${String(Tt.D/10).replace(".", ",")} cm (sabit) · Vauth-Sagel ENVI Space XX Pro ${WASH[washModel(m.width)].name.replace('RAYLI ÇAMAŞIR SEPETİ ', '').toLowerCase()} (${WASH[washModel(m.width)].code})${m.width > washModel(m.width) + 20 ? ` · iki yanda ${(m.width - washModel(m.width))/2} mm dolgu` : ''}</p>` : '')
+        : Tt.Wmin === Tt.Wmax ? `<p class="hint" style="margin:0 0 10px">Genişlik ${Tt.W/10} cm · derinlik ${String(Tt.D/10).replace(".", ",")} cm${Tt.Hmin === Tt.Hmax ? ` · yükseklik ${Tt.H/10} cm` : ''} (sabit)${Tt.pantry ? ` · Vauth-Sagel VS TAL Gate ${Tt.tg.set}, ${Tt.trays} Planero sepet` : ''}</p>` : wField('m-width', 'm', m.width, Tt.Wmin, Tt.Wmax, Tt.Wstep || W_STEP)}
       ${Tt.Hopts ? `<div class="field"><label for="m-height">Yükseklik <output>${m.height} mm</output></label><input type="range" id="m-height" min="${Tt.Hmin}" max="${Tt.Hmax}" step="50" value="${m.height}" data-m="height"></div>` // sürgü; normalize izinli değerlere (Hopts) çeker
         : Tt.Hmin === Tt.Hmax ? '' : `<div class="field"><label for="m-height">Yükseklik <output>${m.height} mm</output></label><input type="range" id="m-height" min="${layoutOf(m).hMin || Tt.Hmin}" max="${Tt.Hmax}" step="100" value="${m.height}" data-m="height"></div>`}
       ${tallElcik(m) ? `<div class="lbl" style="margin-bottom:6px">Elcik</div>
