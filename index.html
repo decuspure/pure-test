@@ -381,11 +381,11 @@ const ELCIK = {d:60, dIn:90, h:300, hIn:360, lip:2, ch:12, y:850}; // kapağa OY
 /* oyuk merkezi (dünya y): yerden 850, kapağın içinde kalacak kadar kırpılır (uçlardan en az 20 mm) */
 const elcikC = (y0, y1) => clamp(ELCIK.y, y0 + ELCIK.hIn/2 + 20, y1 - ELCIK.hIn/2 - 20);
 const TALL_GAP = 100; // boy dolabın yanındaki boşluk (tezgahlı modülle ve iki boy dolap arası, mm)
-/* BOY DOLAP ARKALIĞI (kullanıcının üstten çizimi, 2026-10-09): arkalık (kaplamada 9, lam / lake’de 8 mm) yan dikmelerdeki kanala, ARKA YÜZÜ ARKA KENARDAN HEP 25 mm İÇERİDE oturur
+/* BOY DOLAP ARKALIĞI (kullanıcının üstten çizimi, 2026-10-09): arkalık (kaplamada 9, lam / lake’de 8 mm) yan dikmelerdeki kanala, ÖN YÜZÜ ARKA KENARDAN HEP 25 mm İÇERİDE oturur
    (arkada duvar / tesisat boşluğu); raflar, iç çekmeceler, kiler ve çamaşır mekanizması arkalığın önünden (TALL_BACK) başlar */
-const TALL_BACK_IN = 25; // arkalığın ARKA yüzü yan dikmenin arka kenarından hep 25 mm içeride
+const TALL_BACK_IN = 25; // arkalığın ÖN yüzü yan dikmenin arka kenarından hep 25 mm içeride (kullanıcı düzeltmesi 2026-10-10)
 const backT = mat => (MATS[mat] && MATS[mat].key === 'kaplama') ? 9 : 8; // ARKALIK KALINLIĞI (kullanıcı 2026-10-09): kaplamada 9, lam / lake'de 8 mm (tüm modüller)
-const TALL_BACK = (c = cfg) => TALL_BACK_IN + backT(c.body.mat); // boy dolapta arkalığın ön yüzü (iç parçalar buradan başlar)
+const TALL_BACK = (c = cfg) => TALL_BACK_IN; // boy dolapta arkalığın ön yüzü (iç parçalar buradan başlar); arkalık bunun arkasında, kalınlığı kadar
 const onBase = m => !!TYPES[m.type].base; // 10 cm bazalı, yere basan
 /* tezgah isteğe bağlı (c.top.on, varsayılan açık); yoksa kalınlığı 0 sayılır: dolap üstü tezgah üstü yerine geçer */
 const hasTop = (c = cfg) => c.top.on !== false;
@@ -1003,7 +1003,7 @@ function cutList(c = cfg){
       const Dt = TYPES[m.type].D, cdt = Dt - fT, nSh = tallIdrParts(m, mod, W, cdt), dH = H - 3, DW = (doorFit(m).dw - 3)/2;
       push('Yan dikme', mod, 2, H, cdt, T, bName, bKey, 'Boy dolap (elcikli, tek gövde)');
       push('Alt / üst tabla', mod, 2, W - 2*T, cdt, T, bName, bKey);
-      push('Arkalık', mod, 1, W - 2*T + 10, H - 2*T + 10, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, arka kenardan ${TALL_BACK_IN} mm içeride`);
+      push('Arkalık', mod, 1, W - 2*T + 10, H - 2*T + 10, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, ön yüzü arka kenardan ${TALL_BACK_IN} mm içeride`);
       const st = ' · Düz kapak (elcikli modülde kapak tipi her zaman düz)' + (fGrain('dikey') ? ' · ' + fGrain('dikey') : '');
       const by = moduleDims(m, c).bottomY, ecY = Math.round(elcikC(by + 1.5, by + H - 1.5));
       const ce = ELCIK.lip + ELCIK.ch, ekT = Math.max(1, fT - ce);
@@ -1027,7 +1027,7 @@ function cutList(c = cfg){
       push('Yan dikme (iç)', mod, 2, H, cdt, T, bName, bKey, 'iki gövdenin birleşimi' + (gola ? ` · gola kertiği ${GOLA_D} mm, boy boyunca` : ''));
       push('Alt / üst tabla', mod, 4, bw2 - 2*T, cdt, T, bName, bKey, gola ? `iç uçta${gk}` : '');
       push('Ayarlı raf', mod, 2*nSh, bw2 - 2*T - 2, cdt - TALL_BACK(c) - (gola ? GOLA_D + 4 : 20), T, bName, bKey);
-      push('Arkalık', mod, 2, bw2 - 2*T + 10, H - 2*T + 10, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, arka kenardan ${TALL_BACK_IN} mm içeride`);
+      push('Arkalık', mod, 2, bw2 - 2*T + 10, H - 2*T + 10, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, ön yüzü arka kenardan ${TALL_BACK_IN} mm içeride`);
       const st = (c.front.style !== 'duz' ? ' · ' + frontStyleText(c.front) : '') + (fGrain('dikey') ? ' · ' + fGrain('dikey') : '');
       push('Kapak (sol)', mod, 1, dH, DW, fT, fName, fKey, 'menteşe sol' + st);
       push('Kapak (sağ)', mod, 1, dH, DW, fT, fName, fKey, 'menteşe sağ' + st);
@@ -1047,7 +1047,7 @@ function cutList(c = cfg){
       push('Alt / üst tabla', mod, 2, W - 2*T, cdt, T, bName, bKey);
       if (!tallPantry(m) && tallInterior(m, c).fixed.some(f => f.mid)) push('Sabit orta raf', mod, 1, W - 2*T, cdt - TALL_BACK(c) - (gola ? GOLA_D + 4 : 20), T, bName, bKey, gola ? 'Gola profilinin arkasında' : '');
       const nSh = tallPantry(m) ? 0 : tallIdrParts(m, mod, W, cdt); // kilerde raf yok
-      push('Arkalık', mod, 1, W - 2*T + 10, H - 2*T + 10, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, arka kenardan ${TALL_BACK_IN} mm içeride`);
+      push('Arkalık', mod, 1, W - 2*T + 10, H - 2*T + 10, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, ön yüzü arka kenardan ${TALL_BACK_IN} mm içeride`);
       const fNote = `menteşe ${side}` + (c.front.style !== 'duz' ? ' · ' + frontStyleText(c.front) : '') + (fGrain('dikey') ? ' · ' + fGrain('dikey') : '');
       const DW = doorFit(m).dw; // kapama tarafından 3, diğer taraftan 1,5 mm pay
       if (one){ push('Kapak (tek)', mod, 1, dOne, DW, fT, fName, fKey, fNote); trimRows('Kapak (tek) çıtası', mod, DW, dOne, th); }
@@ -1929,7 +1929,7 @@ function buildTall(m, x0, idx, mx){
     carve(T, H, cd, bm, x0 + W - T/2, bottomY + H/2, cd/2, g, []);
     box(W - 2*T, T, cd, bm, cx, bottomY + T/2, cd/2, g);
     box(W - 2*T, T, cd, bm, cx, top - T/2, cd/2, g);
-    box(W - 2*T, H - 2*T, backT(c.body.mat), bm, cx, bottomY + H/2, TALL_BACK_IN + backT(c.body.mat)/2, g); // raflar ve iç çekmeceler aşağıda (tallInterior)
+    box(W - 2*T, H - 2*T, backT(c.body.mat), bm, cx, bottomY + H/2, TALL_BACK_IN - backT(c.body.mat)/2, g); // raflar ve iç çekmeceler aşağıda (tallInterior)
   } else if (pair){
     // B2: iki ayrı gövde (her biri W/2); gola ise birleşimde dikey C profil, iç yanlar ile alt/üst tablaların ön kenarı boy boyunca kertilir
     const hw = W/2, seam = x0 + hw, vCut = gola ? [{x0: seam - C_H/2, x1: seam + C_H/2, z0: cd - GOLA_D, z1: cd + 1, y0: bottomY - 1, y1: top + 1}] : [];
@@ -1940,7 +1940,7 @@ function buildTall(m, x0, idx, mx){
       carve(T, H, cd, bm, bx + hw - T/2, bottomY + H/2, cd/2, g, vCut);
       carve(hw - 2*T, T, cd, bm, bc, bottomY + T/2, cd/2, g, vCut);
       carve(hw - 2*T, T, cd, bm, bc, top - T/2, cd/2, g, vCut);
-      box(hw - 2*T, H - 2*T, backT(c.body.mat), bm, bc, bottomY + H/2, TALL_BACK_IN + backT(c.body.mat)/2, g);
+      box(hw - 2*T, H - 2*T, backT(c.body.mat), bm, bc, bottomY + H/2, TALL_BACK_IN - backT(c.body.mat)/2, g);
       shelfYs(T, H - T, nSh, T).forEach(ay => box(hw - 2*T - 2, T, shD, bm, bc, bottomY + ay, TALL_BACK(c) + shD/2, g)); // net aralar eşit
     });
     if (gola){ // dikey C profil 74×26, gövde boyunda, iki kapak arasındaki 30 mm boşluğa ortalı
@@ -1955,7 +1955,7 @@ function buildTall(m, x0, idx, mx){
   carve(T, H, cd, bm, x0 + W - T/2, bottomY + H/2, cd/2, g, golaCut);
   box(W - 2*T, T, cd, bm, cx, bottomY + T/2, cd/2, g);
   box(W - 2*T, T, cd, bm, cx, top - T/2, cd/2, g);
-  box(W - 2*T, H - 2*T, backT(c.body.mat), bm, cx, bottomY + H/2, TALL_BACK_IN + backT(c.body.mat)/2, g);
+  box(W - 2*T, H - 2*T, backT(c.body.mat), bm, cx, bottomY + H/2, TALL_BACK_IN - backT(c.body.mat)/2, g);
   }
   // tek gövdeli boy dolap (B1, elcikli B2): raflar ve iç çekmeceler — parça listesiyle ortak hesap (tallInterior)
   // sabit orta raf gola profilinin arkasında biter; ayarlı raflar ve çekmece üstü sabit raf kapaktan 20 mm geride
