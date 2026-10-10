@@ -962,6 +962,7 @@ function cutList(c = cfg){
   const T = bm.t, fT = fm.t, D = c.depth, cd = D - fT;
   const bBack = `${bm.back} · ${colorName(c.body.mat, c.body.color)}`; // arkalık ve çekmece tabanları gövde renginde
   const bKey = bm.key + bm.t, fKey = fm.key + fm.t, b9 = bm.key + '9';
+  const bGrainV = bm.key === 'kaplama' ? ' · Su yönü dikey (boy)' : ''; // boy dolap yan dikmeleri: kaplamada su yönü dikey (boy = yükseklik)
   // ölçüler yukarı yuvarlanmaz: 0,5 mm hassasiyet (ör. B2 kapak 283,5; kapaklar + aralar modül ölçüsünü tutar)
   const half = v => Math.round(v*2)/2;
   const push = (part, mod, qty, L, W, t, mat, key, note='') => rows.push({part, mod, qty, L:half(L), W:half(W), t, mat, key, note});
@@ -1001,7 +1002,7 @@ function cutList(c = cfg){
     const mod = 'M' + (i+1), W = m.width, {H} = moduleDims(m, c), hs = drawerHeights(m, c);
     if (isTall(m) && tallElcik(m)){ // B2 elcikli: TEK gövde, yan yana iki kapak (sol/sağ menteşe, arası 3 mm), elcik yalnız bir kapakta (m.elcikSide)
       const Dt = TYPES[m.type].D, cdt = Dt - fT, nSh = tallIdrParts(m, mod, W, cdt), dH = H - 3, DW = (doorFit(m).dw - 3)/2;
-      push('Yan dikme', mod, 2, H, cdt, T, bName, bKey, 'Boy dolap (elcikli, tek gövde)');
+      push('Yan dikme', mod, 2, H, cdt, T, bName, bKey, 'Boy dolap (elcikli, tek gövde)' + bGrainV);
       push('Alt / üst tabla', mod, 2, W - 2*T, cdt, T, bName, bKey);
       push('Arkalık', mod, 1, W - 2*T + 10, H - 2*T + 10, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, ön yüzü arka kenardan ${TALL_BACK_IN} mm içeride`);
       const st = ' · Düz kapak (elcikli modülde kapak tipi her zaman düz)' + (fGrain('dikey') ? ' · ' + fGrain('dikey') : '');
@@ -1023,8 +1024,8 @@ function cutList(c = cfg){
       const th = tallHandleOf(m, c), Dt = TYPES[m.type].D, cdt = Dt - fT, nSh = pairShelves(H), gola = th === 'kanal', bw2 = W/2;
       const dH = H - 3, DW = (doorFit(m).dw - (gola ? J_GAP : 3))/2; // iki kapak arası 3 mm, gola ise 30 mm
       const gk = gola ? ` · ön kenar gola kertiği ${GOLA_D} mm` : '';
-      push('Yan dikme (dış)', mod, 2, H, cdt, T, bName, bKey, `Boy dolap · 2 gövde × ${bw2} mm`);
-      push('Yan dikme (iç)', mod, 2, H, cdt, T, bName, bKey, 'iki gövdenin birleşimi' + (gola ? ` · gola kertiği ${GOLA_D} mm, boy boyunca` : ''));
+      push('Yan dikme (dış)', mod, 2, H, cdt, T, bName, bKey, `Boy dolap · 2 gövde × ${bw2} mm` + bGrainV);
+      push('Yan dikme (iç)', mod, 2, H, cdt, T, bName, bKey, 'iki gövdenin birleşimi' + (gola ? ` · gola kertiği ${GOLA_D} mm, boy boyunca` : '') + bGrainV);
       push('Alt / üst tabla', mod, 4, bw2 - 2*T, cdt, T, bName, bKey, gola ? `iç uçta${gk}` : '');
       push('Ayarlı raf', mod, 2*nSh, bw2 - 2*T - 2, cdt - TALL_BACK(c) - (gola ? GOLA_D + 4 : 20), T, bName, bKey);
       push('Arkalık', mod, 2, bw2 - 2*T + 10, H - 2*T + 10, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, ön yüzü arka kenardan ${TALL_BACK_IN} mm içeride`);
@@ -1043,7 +1044,7 @@ function cutList(c = cfg){
     if (isTall(m)){ // B1 boy dolap: gövde, raflar, iki kapak, menteşe, askı, kulp/gola
       const one = tallOne(m), th = tallHandleOf(m, c), Dt = TYPES[m.type].D, cdt = Dt - fT, gola = th === 'kanal', gap = gola ? 15 : 1.5, split = tallSplit(m, H);
       const dLo = split - gap - 1.5, dUp = H - split - gap - 1.5, dOne = H - 3, side = m.hinge === 'L' ? 'sol' : 'sağ';
-      push('Yan dikme', mod, 2, H, cdt, T, bName, bKey, tallPantry(m) ? 'Kiler boy dolap · VS TAL Gate ray bağlantısı' : gola ? `Gola kertiği ${GOLA_D} mm · alttan ${split} mm` : 'Boy dolap');
+      push('Yan dikme', mod, 2, H, cdt, T, bName, bKey, (tallPantry(m) ? 'Kiler boy dolap · VS TAL Gate ray bağlantısı' : gola ? `Gola kertiği ${GOLA_D} mm · alttan ${split} mm` : 'Boy dolap') + bGrainV);
       push('Alt / üst tabla', mod, 2, W - 2*T, cdt, T, bName, bKey);
       if (!tallPantry(m) && tallInterior(m, c).fixed.some(f => f.mid)) push('Sabit orta raf', mod, 1, W - 2*T, cdt - TALL_BACK(c) - (gola ? GOLA_D + 4 : 20), T, bName, bKey, gola ? 'Gola profilinin arkasında' : '');
       const nSh = tallPantry(m) ? 0 : tallIdrParts(m, mod, W, cdt); // kilerde raf yok
@@ -1624,7 +1625,7 @@ function buildScene(){
 
 let basinCut = [];
 /* kutu - hazne hacmi: kesişen kısım hazne altına kadar kısaltılır */
-function carve(w, h, d, mat, x, y, z, parent, extra){
+function carve(w, h, d, mat, x, y, z, parent, extra, vert){ // vert: su yönü dikey (boy dolap yan dikmeleri)
   // kutudan kesim hacimleri çıkarılır (hazne: yb'den yukarısı · gola: y0..y1 arası)
   let pieces = [{x0: x - w/2, x1: x + w/2, y0: y - h/2, y1: y + h/2, z0: z - d/2, z1: z + d/2}];
   basinCut.concat(extra || []).forEach(b => {
@@ -1643,7 +1644,7 @@ function carve(w, h, d, mat, x, y, z, parent, extra){
     });
     pieces = out;
   });
-  pieces.forEach(p => box(p.x1 - p.x0, p.y1 - p.y0, p.z1 - p.z0, mat, (p.x0 + p.x1)/2, (p.y0 + p.y1)/2, (p.z0 + p.z1)/2, parent));
+  pieces.forEach(p => { const b = box(p.x1 - p.x0, p.y1 - p.y0, p.z1 - p.z0, mat, (p.x0 + p.x1)/2, (p.y0 + p.y1)/2, (p.z0 + p.z1)/2, parent); if (vert) grainV(b); });
 }
 /* yan yana bazalı modüllerin bazası tek parça: 10 cm, kapak malzemesi */
 function plinthRuns(c = cfg, mx = moduleX(c)){
@@ -1925,8 +1926,8 @@ function buildTall(m, x0, idx, mx){
   const pair = tallPair(m), sd = cd - TALL_BACK(c) - (gola ? GOLA_D + 4 : 20);
   if (pair && tallElcik(m)){
     // B2 elcikli: TEK gövde (tam genişlik), sabit orta raf yok, ayarlı raflar pairShelves(H)
-    carve(T, H, cd, bm, x0 + T/2, bottomY + H/2, cd/2, g, []);
-    carve(T, H, cd, bm, x0 + W - T/2, bottomY + H/2, cd/2, g, []);
+    carve(T, H, cd, bm, x0 + T/2, bottomY + H/2, cd/2, g, [], true); // yan dikme: su yönü dikey
+    carve(T, H, cd, bm, x0 + W - T/2, bottomY + H/2, cd/2, g, [], true); // yan dikme: su yönü dikey
     box(W - 2*T, T, cd, bm, cx, bottomY + T/2, cd/2, g);
     box(W - 2*T, T, cd, bm, cx, top - T/2, cd/2, g);
     box(W - 2*T, H - 2*T, backT(c.body.mat), bm, cx, bottomY + H/2, TALL_BACK_IN - backT(c.body.mat)/2, g); // raflar ve iç çekmeceler aşağıda (tallInterior)
@@ -1936,10 +1937,10 @@ function buildTall(m, x0, idx, mx){
     const shD = cd - TALL_BACK(c) - (gola ? GOLA_D + 4 : 20), nSh = pairShelves(H);
     [x0, seam].forEach(bx => {
       const bc = bx + hw/2;
-      carve(T, H, cd, bm, bx + T/2, bottomY + H/2, cd/2, g, vCut);
-      carve(T, H, cd, bm, bx + hw - T/2, bottomY + H/2, cd/2, g, vCut);
-      carve(hw - 2*T, T, cd, bm, bc, bottomY + T/2, cd/2, g, vCut);
-      carve(hw - 2*T, T, cd, bm, bc, top - T/2, cd/2, g, vCut);
+      carve(T, H, cd, bm, bx + T/2, bottomY + H/2, cd/2, g, vCut, true);
+      carve(T, H, cd, bm, bx + hw - T/2, bottomY + H/2, cd/2, g, vCut, true);
+      carve(hw - 2*T, T, cd, bm, bc, bottomY + T/2, cd/2, g, vCut, true);
+      carve(hw - 2*T, T, cd, bm, bc, top - T/2, cd/2, g, vCut, true);
       box(hw - 2*T, H - 2*T, backT(c.body.mat), bm, bc, bottomY + H/2, TALL_BACK_IN - backT(c.body.mat)/2, g);
       shelfYs(T, H - T, nSh, T).forEach(ay => box(hw - 2*T - 2, T, shD, bm, bc, bottomY + ay, TALL_BACK(c) + shD/2, g)); // net aralar eşit
     });
@@ -1951,8 +1952,8 @@ function buildTall(m, x0, idx, mx){
   } else {
   const golaCut = gola ? [{x0: x0 - 1, x1: x0 + W + 1, z0: cd - GOLA_D, z1: cd + 1, y0: split - C_H/2, y1: split + C_H/2}] : [];
   // gövde
-  carve(T, H, cd, bm, x0 + T/2, bottomY + H/2, cd/2, g, golaCut);
-  carve(T, H, cd, bm, x0 + W - T/2, bottomY + H/2, cd/2, g, golaCut);
+  carve(T, H, cd, bm, x0 + T/2, bottomY + H/2, cd/2, g, golaCut, true);
+  carve(T, H, cd, bm, x0 + W - T/2, bottomY + H/2, cd/2, g, golaCut, true);
   box(W - 2*T, T, cd, bm, cx, bottomY + T/2, cd/2, g);
   box(W - 2*T, T, cd, bm, cx, top - T/2, cd/2, g);
   box(W - 2*T, H - 2*T, backT(c.body.mat), bm, cx, bottomY + H/2, TALL_BACK_IN - backT(c.body.mat)/2, g);
