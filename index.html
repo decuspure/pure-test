@@ -50,6 +50,7 @@ main.views{flex:1;min-height:0;position:relative}
 .ptabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
 .ptabs .n{font:500 11px var(--f-mono);margin-left:5px;background:var(--line);color:var(--ink);border-radius:9px;padding:0 6px}
 .pbody{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.libcats{position:sticky;top:-14px;z-index:2;margin:-14px -14px 0;padding:14px 14px 8px;background:var(--panel)} /* modül grubu düğmeleri (C1…B2) kütüphane kayınca üstte kalır */
 .items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
 .items li{display:flex;border:1px solid var(--line);border-radius:6px;background:var(--raise)}
 .items li[aria-current="true"]{border-color:var(--accent);background:var(--accent-soft)}
@@ -233,11 +234,12 @@ dialog::backdrop{background:rgba(10,14,13,.45)}
   .view{height:auto}
   main.views{overflow:auto}
   .stage{height:70vh}
+  .side.left{height:70vh} /* sol panel sahneyle aynı boyda, içinde kayar: uzun kütüphane (B1) sağ paneli aşağı itmesin */
 }
 @media (max-width:760px){
   .cfg{grid-template-columns:minmax(0,1fr)}
   .stage{order:-1;height:62vh}
-  .side.left{border-right:0}
+  .side.left{border-right:0;height:auto}
   .orders{grid-template-columns:minmax(0,1fr);height:auto}
   .olist ul{max-height:320px}
   .formgrid{grid-template-columns:1fr}
@@ -2756,7 +2758,7 @@ function renderLeft(){
     const hint = lt === 'b1' ? 'Duvara asılı boy dolap; yükseklik 120–180 cm (10 cm adım) ve genişlik 30–50 cm modülün panelinden ayarlanır, derinlik 35 cm. İki eşit kapak (arada gola) ya da tek kapak (gola yerine push-open). Kiler 150 ve Kiler 175: tek kapak, en 45 · derinlik 56,5 cm sabit, içinde Vauth-Sagel VS TAL Gate Planero (antrasit) kiler mekanizması (150: 4 sepet, 175: 5 sepet), kapakla birlikte açılır. Çamaşır: altta Vauth-Sagel ENVI Space XX Pro raylı çamaşır sepeti (çekmece gibi açılır), arada gola, üstte raflı kapak; genişlik 30 / 40 / 45 / 60 (her biri kendi ENVI modeli), yükseklik 125–180 cm, derinlik 56,5 cm. Dizilimin ucunda, tezgahın yanında durur.'
       : lt === 'b2' ? 'Duvara asılı çift kapaklı boy dolap; yükseklik 80–180 cm (10 cm adım) ve genişlik 60–100 cm (10 cm adım) modülün panelinden ayarlanır, derinlik 35 cm. İki ayrı gövde (her biri genişliğin yarısı), yan yana iki kapak (sol kapak soldan, sağ kapak sağdan menteşeli); iki model: Çift kapak (ortada dikey gola, kapak arası 30 mm, profil alüminyum ya da ahşap) ve Elcikli (tek gövde, 120–180 cm, elcik sol ya da sağ kapağın birleşim kenarında oyuk, kapak arası 3 mm).. Dizilimin ucunda, tezgahın yanında durur.'
       : lt === 'c3' ? 'Bazalı; yükseklik yerden tezgah altına, 10 cm baza dahil. Tezgah modülün üstüne oturur.' : 'Askı; tezgahın altına asılır.';
-    body = `<div class="seg">${Object.entries(CATS).map(([k, v]) => `<button data-act="libtype" data-v="${k}" aria-pressed="${lt === k}" title="${v}">${v.split(' - ')[0]}</button>`).join('')}</div>
+    body = `<div class="libcats"><div class="seg">${Object.entries(CATS).map(([k, v]) => `<button data-act="libtype" data-v="${k}" aria-pressed="${lt === k}" title="${v}">${v.split(' - ')[0]}</button>`).join('')}</div></div>
       <h2 class="sec" style="margin:0">${CATS[lt]}</h2>
       <p class="hint" style="margin:-8px 0 0">${hint} Eklemek için karta tıklayın; seçili modülün sağına eklenir.</p>
       <div class="lib">${types.flatMap(([tk, tv]) => LAYOUTS[tk].map(L => `<button class="card" data-act="add" data-type="${tk}" data-layout="${L.id}" title="Dizilime ekle">
