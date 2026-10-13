@@ -664,7 +664,7 @@ const PRICE = {
   gloss:1.2, hinge:9.28 /* Blum 107° siyah frenli, adet */, pin:0.56 /* raf pimi, adet */, tipOn:11.8 /* Blum TIP-ON push-open: kapak ve çekmece aparatı, adet */,
   pull:14.28, // çubuk kulp, adet (GEÇİCİ — kullanıcı: net değil; model/boy/renge göre teyit edilecek)
   golaM:{alu:39.4, front:88.786}, // gola profili €/m (J ve C aynı): alüminyum siyah / ahşap (kapak malzemesi)
-  aluProfile:13, ucut:0 /* U kesim işçiliği fiyata girmez (kullanıcı) */, plinth:13,
+  ucut:0 /* U kesim işçiliği fiyata girmez (kullanıcı) */, plinth:13,
   // Blum LEGRABOX pure BLUMOTION Carbon black, takım satış € (boy + NL): çekmece (tezgah altı) ve iç çekmece (Gizli Çekmece, boy dolap iç çekmecesi)
   lgb:{M450:264.44, C450:341.08}, lgbInner:{M450:347.68, M300:342.8, C300:419.84},
   topM2:{6:85,12:110,20:155,25:180,30:210,40:270,60:340,80:420,100:500,120:580},
@@ -1118,7 +1118,9 @@ function cutList(c = cfg){
     if (!hasTop(c)) push('Üst tabla', mod, 1, W - 2*T, cd - TALL_BACK_IN, T, bName, bKey, 'Tezgah yok · dolabın üstü kapalı · arkalığın önünde biter' + (s ? ' · çanak lavabo üstüne oturur, gider deliği' : ''));
     else if (s){
       push('Arka üst kayıt (dikey)', mod, 1, W - 2*T, 80, T, bName, bKey, 'Lavabo modülü · arkalığa dik');
-      hw.push({item:`Alüminyum ön bağlantı profili 8×50 mm · boy ${W - 2*T} mm (evye tipi)`, mod, qty:1, price:PRICE.aluProfile});
+      // ön bağlantı (kullanıcı 2026-10-13): golada J gola profili kayıt işini görür (ayrı parça yok); golasızda plakadan dik ön kayıt —
+      // önden görünecekse kapak (dış) malzemesi, görünmüyorsa gövde malzemesi; tezgah altında kapak üstü 5 mm boşlukla kayıt kapağın arkasında kalır → gövde
+      if (c.handle !== 'kanal') push('Ön üst kayıt (dikey)', mod, 1, W - 2*T, 50, T, bName, bKey, 'Lavabo modülü · kapağın arkasında (görünmez, gövde malzemesi) · hazneye yer bırakır');
     } else push('Üst kayıt', mod, 2, W - 2*T, 100, T, bName, bKey);
     push('Arkalık', mod, 1, W - 2*T + 10, H - T, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, ön yüzü arka kenardan ${TALL_BACK_IN} mm içeride`);
     if (onBase(m)) hw.push({item:'Ayarlı baza ayağı', mod, qty:4, price:PRICE.plinth/4}); // baza paneli m² ile, ayaklar burada
@@ -1201,7 +1203,7 @@ function cutList(c = cfg){
     if (r.band) return r.band;
     const p = r.part;
     if (/arkalığı|kertiği .*duvarı/.test(p)) return [1, 0];                // çekmece arkalığı, eviye kertiği duvarları: üst kenar                                   // çekmece / gizli çekmece ahşap arkalığı: üst kenar
-    if (/çıtası|tabanı|Arkalık|Arka üst kayıt|Baza/.test(p)) return [0, 0];
+    if (/çıtası|tabanı|Arkalık|Arka üst kayıt|Ön üst kayıt \(dikey\)|Baza/.test(p)) return [0, 0];
     if (/^Çekmece kapağı|^Kapak \(/.test(p)) return [2, 2];                  // kapaklar: dört kenar
     if (/Yan dikme|tabla|raf|Üst kayıt/i.test(p)) return [1, 0];            // gövde: ön kenar (boy boyunca)
     return [0, 0];
@@ -1735,8 +1737,8 @@ function buildModule(m, x0, idx, mx){
   const hs = drawerHeights(m), s = sinkOver(m, c, mx);
   if (!hasTop(c)) carve(W - 2*T, T, cd - TALL_BACK_IN, bm, cx, bottomY + H - T/2, TALL_BACK_IN + (cd - TALL_BACK_IN)/2, g, golaCut); // üst tabla arkalığın önünde biter // tezgah yok: üst tabla (dolabın üstü kapalı; çanak üstüne oturur)
   else if (s){
-    // lavabo modülü: MDF üst ön kayıt yerine evye modülü mantığında ince dikey alüminyum profil + arkalığa dik arka kayıt
-    carve(W - 2*T, 50, 8, M.alu, cx, bottomY + H - 25, cd - 6, g, golaCut);
+    // lavabo modülü: hazne sarktığı için yatık üst kayıt yok; golada J profil ön bağlantıdır, golasızda gövde plakasından dik ön kayıt (kapağın arkasında) + arkalığa dik arka kayıt
+    if (c.handle !== 'kanal') carve(W - 2*T, 50, T, bm, cx, bottomY + H - 25, cd - 2 - T/2, g, golaCut);
     carve(W - 2*T, 80, T, bm, cx, bottomY + H - 40, TALL_BACK_IN + T/2, g); // arkalığın önünde
   } else carve(W - 2*T, T, 100, bm, cx, bottomY + H - T/2, cd - 50, g, golaCut);
   const sinkX = s ? sinkCenterX(s, c, mx) : null;
