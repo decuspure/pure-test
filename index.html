@@ -431,6 +431,20 @@ const tallNoGola = m => tallOne(m); // gola yalnız tek kapaklı boy dolapta olm
 /* B2 ayarlı raf sayısı: ~30 cm aralıkla, 80 cm'de 2, 120'de 3, 180'de 5 */
 /* kapak boyuna göre menteşe adedi (boy dolap kapakları) */
 const hingeN = h => h > 1500 ? 4 : h > 900 ? 3 : 2;
+/* menteşe yükseklikleri: uçlardan 100 mm, aradakiler eşit; iç çekmece varsa (zones: ön panel [alt, üst]) çekmeceye denk gelen menteşe
+   en yakın boş araya alınır (çekmeceler arası ve en üst çekmece–sabit raf arası IDR_GAP; montaj plakası 46 mm) — kullanıcı 2026-10-12 */
+const hingeYs = (y0, y1, zones = [], shelves = []) => {
+  const n = hingeN(y1 - y0), ys = Array.from({length: n}, (_, i) => y0 + 100 + (y1 - y0 - 200)*i/(n - 1));
+  if (!zones.length) return ys;
+  const gaps = zones.map((z, i) => (z[1] + (i + 1 < zones.length ? zones[i + 1][0] : z[1] + IDR_GAP))/2), used = new Set();
+  return ys.map(y => {
+    if (!zones.some(z => y + 23 > z[0] && y - 23 < z[1])){ // çekmeceye değmiyor: sabit rafa denk gelirse rafın üstüne kayar
+      const s = shelves.find(s => y + 23 > s[0] && y - 23 < s[1]); return s ? s[1] + 28 : y;
+    }
+    const gi = gaps.map((g, i) => i).filter(i => !used.has(i)).sort((a, b) => Math.abs(gaps[a] - y) - Math.abs(gaps[b] - y))[0];
+    if (gi == null) return y; used.add(gi); return gaps[gi];
+  });
+};
 const pairShelves = H => Math.max(1, Math.round(H/300) - 1);
 /* yalnız golalı boy dolaplar: B2 ve iki kapaklı B1 (kulp seçimi yok, yalnız profil rengi); tek kapaklı B1'de gola olamaz */
 /* B2 elcikli (dizilim 'ke'): tutamak tek tip elcik, seçim yok */
@@ -438,7 +452,9 @@ const tallElcik = m => tallPair(m) && layoutOf(m).id === 'ke';
 const tallGolaOnly = m => isTall(m) && !tallElcik(m) && (tallPair(m) || !tallOne(m));
 /* boy dolap İÇ ÇEKMECE (golasız boy dolaplar: tek kapaklı B1, elcikli B2): alttan yukarı 0–3 LEGRABOX iç çekmece, her biri M ya da C (m.idr),
    metal ön panel yanlarla aynı yükseklikte, kulpsuz; bölme = ray payı + yan + 24 mm üst boşluk; çekmecelerin üstünde sabit raf, ayarlı raflar kalan yükseklikte */
-const IDR_MAX = 3, IDR_NL = 270, IDR_GAP = 50; // iç çekmece ön panelleri arası 5 cm (kullanıcı isteği)
+// iç çekmece ön panelleri arası 5 cm (kullanıcı isteği). NL 300 (kullanıcı 2026-10-12): çekmece kapaktan geride değil, gövde önüne kadar oturur
+// (35 cm boy dolapta gövde içi 331–332 − arkalık 25 − 2 = 304–305 ≥ NL 300; Blum LT min = NL + 3); menteşeler çekmece aralarındaki boşluklara gelir (hingeYs)
+const IDR_MAX = 3, IDR_NL = 300, IDR_GAP = 50;
 /* Blum LEGRABOX iç çekmece (blum.com ürün gamı + iç ön panel verileri): YANLAR HER İKİSİNDE M (90,5);
    M: kapalı metal iç ön panel 98 mm, dolapta 109 mm yer; C: yüksek metal iç ön panel 185 mm + yanlarda üstte GALERİ RAYI (önden arkaya), dolapta 191 mm yer */
 // ön panel yüksekliği Blum'daki 98 / 185 değil: kullanıcı isteğiyle yan / galeri rayıyla SIFIR (tallInterior); space Blum'un dolapta istediği yer
@@ -643,13 +659,21 @@ const STATUSES = [
 ];
 /* örnek birim fiyatlar (€) — gerçek fiyat listesi sonra girilecek */
 const PRICE = {
-  m2:{kaplama19:105, kaplama9:70, lam18:38, lam9:26, lake18:92, lake9:60},
-  gloss:1.2, hinge:7, runner:48, aluProfile:13, hidden:64, ucut:36, plinth:13,
+  m2:{kaplama19:144, kaplama9:96.68, lam18:37.17, lam9:26.51, lake18:92, lake9:60}, // satış €/m² (kaplama, lam gerçek; lam9 = 8 mm plaka)
+  m2Col:{dcsgb:{lam18:29.736, lam9:23.494}}, // renge özel m² fiyatı (yoksa m2): DCS-G-B ucuz; ÇB, T, S m2'deki fiyat
+  gloss:1.2, hinge:9.28 /* Blum 107° siyah frenli, adet */, pin:0.56 /* raf pimi, adet */, tipOn:11.8 /* Blum TIP-ON push-open: kapak ve çekmece aparatı, adet */,
+  pull:14.28, // çubuk kulp, adet (GEÇİCİ — kullanıcı: net değil; model/boy/renge göre teyit edilecek)
+  golaM:{alu:39.4, front:88.786}, // gola profili €/m (J ve C aynı): alüminyum siyah / ahşap (kapak malzemesi)
+  aluProfile:13, ucut:0 /* U kesim işçiliği fiyata girmez (kullanıcı) */, plinth:13,
+  // Blum LEGRABOX pure BLUMOTION Carbon black, takım satış € (boy + NL): çekmece (tezgah altı) ve iç çekmece (Gizli Çekmece, boy dolap iç çekmecesi)
+  lgb:{M450:264.44, C450:341.08}, lgbInner:{M450:347.68, M300:342.8, C300:419.84},
   topM2:{6:85,12:110,20:155,25:180,30:210,40:270,60:340,80:420,100:500,120:580},
   sink:{vessel_round:130, integrated:195}, drain:{gizli:50, rampa:44, zarf:68}, faucetHole:9,
   mirrorM2:76, mirrorBase:18, mirrorShape:{organik:1.4, kemer:1.2, kapsul:1.1, oval:1.1}, led:52, vat:.20,
-  bandM:{kaplama:2.4, lam:0.9} // kenar bandı €/m (örnek); lake kenarları boyalı, bant yok
+  bandM:{kaplama:1, lam:0.478}, // kenar bandı satış €/m (bant enine göre fark yok); lake kenarları boyalı, bant yok
+  bandLabor:0.96 // bant yapıştırma işçiliği €/m (bantlı her metre)
 };
+const golaPrice = (fin, L) => (fin === 'front' ? PRICE.golaM.front : PRICE.golaM.alu)*L/1000; // profil boyu (mm) × €/m
 
 /* ============================================================
    DURUM
@@ -973,7 +997,10 @@ function cutList(c = cfg){
   const bGrainV = bm.key === 'kaplama' ? ' · Su yönü dikey (boy)' : ''; // boy dolap yan dikmeleri: kaplamada su yönü dikey (boy = yükseklik)
   // ölçüler yukarı yuvarlanmaz: 0,5 mm hassasiyet (ör. B2 kapak 283,5; kapaklar + aralar modül ölçüsünü tutar)
   const half = v => Math.round(v*2)/2;
-  const push = (part, mod, qty, L, W, t, mat, key, note='') => rows.push({part, mod, qty, L:half(L), W:half(W), t, mat, key, note});
+  // col: parçanın renk id'si (renge göre m² fiyatı, PRICE.m2Col) — gövde adı/rengi taşıyan parçalar gövde rengi, diğerleri kapak rengi
+  const bCN = colorName(c.body.mat, c.body.color);
+  const push = (part, mod, qty, L, W, t, mat, key, note='') => rows.push({part, mod, qty, L:half(L), W:half(W), t, mat, key, note,
+    col: String(key).startsWith(bm.key) && mat.includes(bCN) ? c.body.color : c.front.color});
   // kapak çıtaları (çekmece kapağı ve boy dolap kapağı için ortak): dw × dh kapak ölçüsü
   const trimRows = (label, mod, dw, dh, handle) => {
     const tl = trimLayout(c.front, dw, dh, handle); if (!tl) return;
@@ -1002,7 +1029,7 @@ function cutList(c = cfg){
       const bs = r.k, gal = IDR[bs].gallery;
       push(`İç çekmece tabanı ${k+1}`, mod, 1, LW - 35, IDR_NL - 40, T, bName, bKey, `LEGRABOX tabanı (iç çekmece ${bs})`);
       push(`İç çekmece arkalığı ${k+1}`, mod, 1, LW - 38, r.bh, T, bName, bKey, `LEGRABOX ahşap arkalık (${bs})`); // 3B ile aynı (tallInterior)
-      hw.push({item:`İç çekmece ${k+1} · Blum LEGRABOX pure iç çekmece ${bs} (çekmece yüksekliği ${String(r.fh).replace('.', ',')} mm: metal iç ön panel ray altından ${gal ? 'galeri rayı' : 'yan'} üstüne, altta ve üstte sıfır; M yan${gal ? ' + galeri rayı' : ''}, kulpsuz; dolapta ${IDR[bs].space} mm) · NL ${IDR_NL} · ${LGB.color} · tam açılım, BLUMOTION · menteşe hizasında ray mesafe parçası gerekebilir`, mod, qty:1, price:PRICE.hidden});
+      hw.push({item:`İç çekmece ${k+1} · Blum LEGRABOX pure iç çekmece ${bs} (çekmece yüksekliği ${String(r.fh).replace('.', ',')} mm: metal iç ön panel ray altından ${gal ? 'galeri rayı' : 'yan'} üstüne, altta ve üstte sıfır; M yan${gal ? ' + galeri rayı' : ''}, kulpsuz; dolapta ${IDR[bs].space} mm) · NL ${IDR_NL} · ${LGB.color} · tam açılım, BLUMOTION · gövde önüne kadar, menteşeler çekmece aralarında`, mod, qty:1, price:PRICE.lgbInner[bs + IDR_NL] ?? 0});
     });
     return nSh;
   };
@@ -1023,10 +1050,10 @@ function cutList(c = cfg){
       push('Kapak (sağ)', mod, 1, dH, DW, fT, fName, fKey, (m.elcikSide === 'R' ? el : '') + 'menteşe sağ' + st);
       hw.push({item:`Elcik oyma işçiliği (CNC, ${m.elcikSide === 'R' ? 'sağ' : 'sol'} kapak)`, mod, qty:1, price:0});
       // elcikli kapak her zaman düz: çıta satırı yok
-      hw.push({item:'Blum menteşe, siyah (frenli BLUMOTION, tam bindirme) · sol', mod, qty:hingeN(dH), price:PRICE.hinge});
-      hw.push({item:'Blum menteşe, siyah (frenli BLUMOTION, tam bindirme) · sağ', mod, qty:hingeN(dH), price:PRICE.hinge});
+      hw.push({item:'Blum menteşe 107°, siyah (frenli BLUMOTION, tam bindirme) · sol', mod, qty:hingeN(dH), price:PRICE.hinge});
+      hw.push({item:'Blum menteşe 107°, siyah (frenli BLUMOTION, tam bindirme) · sağ', mod, qty:hingeN(dH), price:PRICE.hinge});
       hw.push({item:'Gizli askı mekanizması', mod, qty:2, price:0});
-      hw.push({item:'Raf pimi', mod, qty:4*nSh, price:0});
+      hw.push({item:'Raf pimi', mod, qty:4*nSh, price:PRICE.pin});
       return;
     }
     if (isTall(m) && tallPair(m)){ // B2 çift kapaklı boy dolap: iki ayrı gövde (W/2), ayarlı raflar, yan yana iki kapak (sol/sağ menteşe), ortada dikey gola C profil (hep gola)
@@ -1043,12 +1070,12 @@ function cutList(c = cfg){
       push('Kapak (sol)', mod, 1, dH, DW, fT, fName, fKey, 'menteşe sol' + st);
       push('Kapak (sağ)', mod, 1, dH, DW, fT, fName, fKey, 'menteşe sağ' + st);
       trimRows('Kapak (sol) çıtası', mod, DW, dH, th); trimRows('Kapak (sağ) çıtası', mod, DW, dH, th);
-      hw.push({item:'Blum menteşe, siyah (frenli BLUMOTION, tam bindirme) · sol', mod, qty:hingeN(dH), price:PRICE.hinge});
-      hw.push({item:'Blum menteşe, siyah (frenli BLUMOTION, tam bindirme) · sağ', mod, qty:hingeN(dH), price:PRICE.hinge});
+      hw.push({item:'Blum menteşe 107°, siyah (frenli BLUMOTION, tam bindirme) · sol', mod, qty:hingeN(dH), price:PRICE.hinge});
+      hw.push({item:'Blum menteşe 107°, siyah (frenli BLUMOTION, tam bindirme) · sağ', mod, qty:hingeN(dH), price:PRICE.hinge});
       hw.push({item:'Gizli askı mekanizması', mod, qty:4, price:0});
-      hw.push({item:'Raf pimi', mod, qty:8*nSh, price:0});
+      hw.push({item:'Raf pimi', mod, qty:8*nSh, price:PRICE.pin});
       hw.push({item:'Gövde birleştirme vidası', mod, qty: H > 1200 ? 4 : 3, price:0});
-      if (gola) hw.push({item:`Gola C profil 74×26 (dikey, iki kapak arası) · ${m.kanalFin === 'front' ? 'ahşap · su yönü profil boyunca (dikey) · ' + colorName(c.front.mat, c.front.color) : 'alüminyum (siyah)'} · boy ${H} mm`, mod, qty:1, price:0});
+      if (gola) hw.push({item:`Gola C profil 74×26 (dikey, iki kapak arası) · ${m.kanalFin === 'front' ? 'ahşap · su yönü profil boyunca (dikey) · ' + colorName(c.front.mat, c.front.color) : 'alüminyum (siyah)'} · boy ${H} mm`, mod, qty:1, price:golaPrice(m.kanalFin, H)});
       return;
     }
     if (isTall(m)){ // B1 boy dolap: gövde, raflar, iki kapak, menteşe, askı, kulp/gola
@@ -1069,9 +1096,9 @@ function cutList(c = cfg){
         push('Kapak (üst)', mod, 1, dUp, DW, fT, fName, fKey, fNote);
         trimRows('Kapak (alt) çıtası', mod, DW, dLo, th); trimRows('Kapak (üst) çıtası', mod, DW, dUp, th);
       }
-      hw.push({item:`Blum menteşe, siyah (frenli BLUMOTION, tam bindirme) · ${side}`, mod, qty: one ? hingeN(dOne) : (tallWash(m) ? 0 : hingeN(dLo)) + hingeN(dUp), price:PRICE.hinge}); // çamaşırda alt kapak menteşesiz
+      hw.push({item:`Blum menteşe 107°, siyah (frenli BLUMOTION, tam bindirme) · ${side}`, mod, qty: one ? hingeN(dOne) : (tallWash(m) ? 0 : hingeN(dLo)) + hingeN(dUp), price:PRICE.hinge}); // çamaşırda alt kapak menteşesiz
       hw.push({item:'Gizli askı mekanizması', mod, qty:2, price:0});
-      if (nSh) hw.push({item:'Raf pimi', mod, qty:4*nSh, price:0});
+      if (nSh) hw.push({item:'Raf pimi', mod, qty:4*nSh, price:PRICE.pin});
       if (tallWash(m)){ const wm = washModel(W), wd = WASH[wm]; // Vauth-Sagel ENVI Space XX Pro, beyaz (makroaks.com.tr)
         hw.push({item:`Vauth-Sagel ENVI Space XX Pro ${wd.name} (${wd.code}) · tam açılım, yavaşlatıcılı, sürgülü üst kapak · istenen renk çekmecelerle aynı (Carbon black), tedarikçiden teyit · ${wm}'lük model${W > wm + 20 ? ` · iki yanda ${(W - wm)/2} mm dolgu` : ''}`, mod, qty:1, price:0}); }
       if (tallPantry(m)){ const tg = TYPES[m.type].tg, nT = TYPES[m.type].trays; // Vauth-Sagel VS TAL Gate Planero Lava (antrasit), 45'lik kapak — makroaks.com.tr ürün listesi
@@ -1079,9 +1106,9 @@ function cutList(c = cfg){
         hw.push({item:`Vauth-Sagel VS TAL Gate ${tg.frame[1]} Lava (${tg.frame[0]})`, mod, qty:1, price:0});
         hw.push({item:`Vauth-Sagel VS TAL Gate kapak bağlantısı 450 mm Lava (90006716)`, mod, qty:1, price:0});
         hw.push({item:`Vauth-Sagel Planero sepet Lava 450 mm (90007982)`, mod, qty:nT, price:0}); }
-      if (gola) hw.push({item:`Gola C profil 74×26 (iki kapak arası) · ${m.kanalFin === 'front' ? 'ahşap · su yönü profil boyunca · ' + colorName(c.front.mat, c.front.color) : 'alüminyum (siyah)'} · boy ${W} mm`, mod, qty:1, price:0});
-      if (th === 'kulp') hw.push({item:`Çubuk kulp 160 mm (dikey) · ${HANDLE_COLORS[m.handleColor].label}`, mod, qty: one ? 1 : 2, price:0});
-      if (th === 'push') hw.push({item:'Push-open (kapak) itici', mod, qty: one ? 1 : 2, price:0});
+      if (gola) hw.push({item:`Gola C profil 74×26 (iki kapak arası) · ${m.kanalFin === 'front' ? 'ahşap · su yönü profil boyunca · ' + colorName(c.front.mat, c.front.color) : 'alüminyum (siyah)'} · boy ${W} mm`, mod, qty:1, price:golaPrice(m.kanalFin, W)});
+      if (th === 'kulp') hw.push({item:`Çubuk kulp 160 mm (dikey) · ${HANDLE_COLORS[m.handleColor].label}`, mod, qty: one ? 1 : 2, price:PRICE.pull});
+      if (th === 'push') hw.push({item:'Blum TIP-ON (kapak, push-open)', mod, qty: one ? 1 : 2, price:PRICE.tipOn});
       return;
     }
     const s = sinkOver(m, c, mx), fit = drawerFit(m, c, mx); // 3B ile ortak kutu hesabı
@@ -1109,9 +1136,10 @@ function cutList(c = cfg){
         push(`Eviye kertiği yan duvarı ${k+1}`, mod, 2, U_D + T, lg[1] - T, T, bName, bKey, 'iki ucu 45° gönye (arkalık ve ön duvarla)');
         push(`Eviye kertiği ön duvarı ${k+1}`, mod, 1, uw + 2*T, lg[1] - T, T, bName, bKey, 'iki ucu 45° gönye (yan duvarlarla)');
       }
-      hw.push({item:`Blum LEGRABOX pure ${lg[0]} (yan ${String(lg[1]).replace('.', ',')} mm) · NL ${NL} · ${LGB.color} · ahşap arkalık bağlantısı · tam açılım, BLUMOTION`, mod, qty:1, price:PRICE.runner});
-      if (c.handle === 'kanal') hw.push({item:`Gola ${k === 0 ? 'J profil 26×58,8 (tezgah altı)' : 'C profil 74×26 (iki kapak arası)'} · ${c.kanalFin === 'front' ? 'ahşap · su yönü profil boyunca · ' + colorName(c.front.mat, c.front.color) : 'alüminyum (siyah)'} · boy ${W} mm`, mod, qty:1, price:0});
-      if (c.handle === 'kulp') hw.push({item:`Çubuk kulp ${Math.round(Math.min(W*.5, 320))} mm · ${HANDLE_COLORS[c.handleColor].label}`, mod, qty:1, price:0});
+      hw.push({item:`Blum LEGRABOX pure ${lg[0]} (yan ${String(lg[1]).replace('.', ',')} mm) · NL ${NL} · ${LGB.color} · ahşap arkalık bağlantısı · tam açılım, BLUMOTION`, mod, qty:1, price:PRICE.lgb[lg[0] + NL] ?? 0});
+      if (c.handle === 'kanal') hw.push({item:`Gola ${k === 0 ? 'J profil 26×58,8 (tezgah altı)' : 'C profil 74×26 (iki kapak arası)'} · ${c.kanalFin === 'front' ? 'ahşap · su yönü profil boyunca · ' + colorName(c.front.mat, c.front.color) : 'alüminyum (siyah)'} · boy ${W} mm`, mod, qty:1, price:golaPrice(c.kanalFin, W)});
+      if (c.handle === 'push') hw.push({item:'Blum TIP-ON aparatı (çekmece, push-open; LEGRABOX ile)', mod, qty:1, price:PRICE.tipOn});
+      if (c.handle === 'kulp') hw.push({item:`Çubuk kulp ${Math.round(Math.min(W*.5, 320))} mm · ${HANDLE_COLORS[c.handleColor].label}`, mod, qty:1, price:PRICE.pull});
       if (u) hw.push({item:'U kesim işçiliği + sifon kanalı', mod, qty:1, price:PRICE.ucut});
       const o = m.org[k];
       if (o && o !== 'yok') hw.push({item:'Organizer · ' + ORGS[o].label, mod, qty:1, price:ORGS[o].price, kind:'org'});
@@ -1120,7 +1148,7 @@ function cutList(c = cfg){
     if (inner){
       push('Gizli Çekmece tabanı', mod, 1, W - 2*T - 35, NL - 40, T, bName, bKey, s ? `U kesim ${uCutW(W, T)}×${U_D} mm` : 'LEGRABOX tabanı');
       push('Gizli Çekmece arkalığı', mod, 1, W - 2*T - 38, LGB_M[1] - T, T, bName, bKey, 'LEGRABOX ahşap arkalık (M) · yanla hemyüz'); // 3B'de de çiziliyor (drawerBox, LGB_M)
-      hw.push({item:`Gizli Çekmece · Blum LEGRABOX iç çekmece (yan M 90,5 mm, metal ön panel ${String(LGB_M[1]).replace('.', ',')} mm, yanlarla aynı hizada, kulpsuz) · ${LGB.color} · gövdeye bağlı ray, tam açılım`, mod, qty:1, price:PRICE.hidden});
+      hw.push({item:`Gizli Çekmece · Blum LEGRABOX iç çekmece (yan M 90,5 mm, metal ön panel ${String(LGB_M[1]).replace('.', ',')} mm, yanlarla aynı hizada, kulpsuz) · ${LGB.color} · gövdeye bağlı ray, tam açılım`, mod, qty:1, price:PRICE.lgbInner['M' + NL] ?? 0});
     }
   });
   plinthRuns(c, mx).forEach(r => { const mod = r.i0 === r.i1 ? 'M' + (r.i0 + 1) : `M${r.i0 + 1}–M${r.i1 + 1}`;
@@ -1192,7 +1220,7 @@ function priceOf(c = cfg){
   let carcass = 0, fronts = 0, sides = 0;
   cl.rows.forEach(r => {
     const a = r.qty * r.L * r.W / 1e6;
-    let rate = PRICE.m2[r.key] || 0;
+    let rate = (PRICE.m2Col[r.col] || {})[r.key] ?? PRICE.m2[r.key] ?? 0;
     const front = r.part.startsWith('Çekmece kapağı') || r.part.startsWith('Kapak ('); // çekmece ve boy dolap kapakları (çıtaları dahil)
     if (front && c.front.mat === 'lake' && c.front.fin === 'parlak') rate *= PRICE.gloss;
     if (r.part.startsWith('Yan kapama')) sides += a*rate*(r.t > 19 ? 1 + r.t/50 : 1);
@@ -1203,6 +1231,7 @@ function priceOf(c = cfg){
   const mx = moduleX(c);
   const top = ctrMods(c).length && hasTop(c) ? (mx.runL*topD(c)/1e6) * PRICE.topM2[c.top.t] * (c.top.surf === 'parlak' ? 1.08 : 1) : 0;
   const band = Object.values(cl.bands).reduce((s, b) => s + b.m*(PRICE.bandM[b.mat] || 0), 0);
+  const bandLab = Object.values(cl.bands).reduce((s, b) => s + b.m, 0)*PRICE.bandLabor;
   const sinks = c.sinks.reduce((s,k) => s + PRICE.sink[k.type] + (k.type === 'integrated' ? PRICE.drain[k.drain] : 0) + (k.faucet === 'delikli' ? PRICE.faucetHole : 0), 0);
   const mirrors = c.mirrors.reduce((s,m) => s + (m.w*m.h/1e6)*PRICE.mirrorM2*(PRICE.mirrorShape[m.shape] || 1) + (m.led ? PRICE.led : 0) + PRICE.mirrorBase, 0);
   const lines = [
@@ -1210,6 +1239,7 @@ function priceOf(c = cfg){
     ['Kapaklar', fronts],
     ['Yan kapamalar', sides],
     ['Kenar bandı', band],
+    ['Kenar bandı işçiliği', bandLab],
     ['Çekmece sistemleri ve işçilik', hwSum],
     ['Organizerler', orgSum],
     ['Porselen tezgah', top],
@@ -1333,12 +1363,8 @@ function baseMats(){
   // çakışan kenarlar (kapama-gövde, tezgah-kapama) üst üste binip kalın görünmesin: eşit derinlikte ikinci çizgi çizilmez
   M.edge = new THREE.LineBasicMaterial({color: srgb('#2a302e'), transparent:true, opacity:.22, depthFunc: THREE.LessDepth});
   M.wall = new THREE.MeshStandardMaterial({color: srgb(WALL_HEX), roughness:.95, envMapIntensity:.4});
-  M.floor = new THREE.MeshStandardMaterial({map: canvasTex(512, 512, (x,w,h) => {
-    x.fillStyle = '#aaa59b'; x.fillRect(0,0,w,h);
-    x.strokeStyle = '#b3ada2'; x.lineWidth = 3; x.strokeRect(0,0,w,h);
-    const r = rng(9); for (let i = 0; i < 3000; i++){ x.globalAlpha = .12; x.fillStyle = r() > .5 ? '#ffffff' : '#9c968a'; x.fillRect(r()*w, r()*h, 2, 2); }
-  }, [1,1]), roughness:.85, envMapIntensity:.35});
-  M.floor.userData.tile = 600;
+  M.floor = new THREE.MeshStandardMaterial({color: srgb('#d0d2d7'), roughness:.9, envMapIntensity:.35}); // ÇOK UÇUK NÖTR GRİ: ışık sıcak olduğu için renk hafif mavimsi seçildi → ekranda ~(240, 240, 241), duvar 255, düz (kullanıcı 2026-10-13: yer olduğu belli olsun; eskiden gri karo)
+
 }
 
 function fixUV(geo, w, h, d, tile){
@@ -1467,11 +1493,11 @@ function projMenu(open){
   m.hidden = !open; b.setAttribute('aria-expanded', open);
 }
 document.addEventListener('click', e => { if (!e.target.closest('.vc-proj')) projMenu(false); });
-// duvar: kum sarısı · arka plan: duvar renginin %40 koyusu
-const WALL_HEX = '#d9cfbf';
-const BG_HEX = '#' + [1, 3, 5].map(i => Math.round(parseInt(WALL_HEX.slice(i, i + 2), 16)*.6).toString(16).padStart(2, '0')).join('');
+// duvar: beyaz · arka plan: yerden çok az koyu uçuk gri
+const WALL_HEX = '#ffffff'; // arka duvar bembeyaz (kullanıcı 2026-10-13; eskiden kum #d9cfbf)
+const BG_HEX = '#e8e8e9'; // arka plan: yerden (ekranda ~240) çok az koyu uçuk gri (kullanıcı 2026-10-13; eskiden duvar renginin %60'ı)
 function applyStageBg(){
-  scene.background = srgb(BG_HEX); vpEl.style.background = BG_HEX;
+  scene.background = new THREE.Color(BG_HEX); vpEl.style.background = BG_HEX; // arka plan çıkışta sRGB'ye çevrilmez (r128): renk olduğu gibi verilir, ekranda BG_HEX görünür
 }
 function resize(){
   const w = vpEl.clientWidth, h = vpEl.clientHeight; if (!w || !h) return;
@@ -1984,11 +2010,11 @@ function buildTall(m, x0, idx, mx){
     ti.adj.forEach(ay => box(W - 2*T - 2, T, shD, bm, cx, bottomY + ay, TALL_BACK(c) + shD/2, g)); // ayarlı raflar: net aralar eşit
     // iç çekmece: LEGRABOX, NL 270, yanlar M; M'de 98 mm, C'de 185 mm metal iç ön panel (kulpsuz, rayı örter);
     // C'de arkalık C yüksekliğinde ve yanların üstünde önden arkaya galeri rayı (Blum "front piece with gallery"). Kapaklar ~70° açılınca kayar, kapanırken önce çekmeceler girer
-    const z1 = Math.max(cd - 30, TALL_BACK(c) + 2 + IDR_NL), z0 = z1 - IDR_NL, BT = matT(c.body.mat), S = LGB.side;
+    const z1 = cd - 2, z0 = z1 - IDR_NL, BT = matT(c.body.mat), S = LGB.side; // gövde önüne kadar (kapaktan geride değil); arka ucu arkalığın önünde
     ti.rows.forEach((r, k) => {
       const ig = new THREE.Group(), yb = bottomY + r.yb, dist = 230 - k*20, gal = IDR[r.k].gallery, bh = r.bh; g.add(ig);
       drawerBox(ig, {x0: x0 + T + 13, x1: x0 + W - T - 13, yb, hb: r.sh, lgb: ['M', r.sh], bh, z0, z1}); // yan rayın üstünde, ön panelle (anma ölçüsü) sıfır
-      box(W - 2*T - 28, r.fh, 12, M.lgb, cx, bottomY + r.fy + r.fh/2, z1 + 6, ig);
+      box(W - 2*T - 28, r.fh, 12, M.lgb, cx, bottomY + r.fy + r.fh/2, z1 - 6, ig);
       if (gal) [x0 + T + 13 + S/2, x0 + W - T - 13 - S/2].forEach(sx => box(S, 10, z1 - z0, M.lgb, sx, yb + BT + bh - 5, (z0 + z1)/2, ig)); // galeri rayı (yassı profil)
       ig.userData.key = m.uid + ':i' + k; ig.userData.target = () => 0;
       ig.userData.update = () => {
@@ -2018,7 +2044,7 @@ function buildTall(m, x0, idx, mx){
     const dg = new THREE.Group(); dg.position.set(px, 0, cd + fT); dg.userData.key = m.uid + ':d' + k; g.add(dg);
     // SİYAH BLUM MENTEŞE (kapak açılınca görünür): kapakta Ø35 kap (kapak arkasında, kenardan 22,5 mm), gövdede yan panelin iç yüzünde
     // montaj plakası + kol (ön kenara kadar). Adet parça listesiyle aynı (hingeN); uçlardan 100 mm, aradakiler eşit aralıklı
-    if (!d.pull){ const hn = hingeN(d.y1 - d.y0), hys = Array.from({length: hn}, (_, i) => d.y0 + 100 + (d.y1 - d.y0 - 200)*i/(hn - 1)), xi = R ? x0 + W - T : x0 + T, si = R ? -1 : 1;
+    if (!d.pull){ const tin = tallInterior(m, c), hys = hingeYs(d.y0, d.y1, tin.rows.map(r => [bottomY + r.fy, bottomY + r.fy + r.fh]), tin.fixed.map(f => [bottomY + f.y - T/2, bottomY + f.y + T/2])), xi = R ? x0 + W - T : x0 + T, si = R ? -1 : 1;
       hys.forEach(hy => {
         const cup = cyl(17.5, 2.5, M.hinge, dg, 'z'); cup.position.set(sgn*22.5, hy, -fT - 1.25);                       // kap flanşı (kapak arkasında)
         box(10, 46, 34, M.hinge, xi + si*5, hy, cd - 37 - 17, g);                                                     // montaj plakası (yan panelde, önden 37 mm)
