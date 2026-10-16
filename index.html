@@ -50,7 +50,10 @@ main.views{flex:1;min-height:0;position:relative}
 .ptabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
 .ptabs .n{font:500 11px var(--f-mono);margin-left:5px;background:var(--line);color:var(--ink);border-radius:9px;padding:0 6px}
 .pbody{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:14px;min-height:0}
-.libcats{position:sticky;top:-14px;z-index:2;margin:-14px -14px 0;padding:14px 14px 8px;background:var(--panel)} /* modül grubu düğmeleri (C1…B2) kütüphane kayınca üstte kalır */
+.libcats{position:sticky;top:-14px;z-index:2;margin:-14px -14px 0;padding:14px 14px 8px;background:var(--panel)} /* modül grubu düğmeleri (C1…P1) kütüphane kayınca üstte kalır */
+.libcats .seg{display:grid;grid-template-columns:repeat(3,1fr)} /* 6 grup: 3 + 3 iki satır (kullanıcı 2026-10-16) */
+.libcats .seg button:nth-child(3n+1){border-left:0}
+.libcats .seg button:nth-child(n+4){border-top:1px solid var(--line)}
 .items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
 .items li{display:flex;border:1px solid var(--line);border-radius:6px;background:var(--raise)}
 .items li[aria-current="true"]{border-color:var(--accent);background:var(--accent-soft)}
@@ -352,7 +355,7 @@ const TOP_T = [6,12,20,25,30,40,60,80,100,120];
 const W_MIN = 300, W_MAX = 1200, W_STEP = 50; // tezgah altı modül genişliği mm (C1, C2, C3 hepsi 30–120 cm; kullanıcı kararı), 5 cm adım
 const wMax = m => (TYPES[m.type] && TYPES[m.type].Wmax) || W_MAX; // tipe göre üst sınır (boy dolaplar kendi Wmax'ı; tezgah altı W_MAX)
 /* modül grupları: C1/C2/C3 çekmece sayısına göre, B1 boy */
-const CATS = {c1:'C1 - Tek Çekmece', c2:'C2 - İki Çekmece', c3:'C3 - Üç Çekmece', b1:'B1 - Boy', b2:'B2 - Çift Kapak Boy'};
+const CATS = {c1:'C1 - Tek Çekmece', c2:'C2 - İki Çekmece', c3:'C3 - Üç Çekmece', b1:'B1 - Boy', b2:'B2 - Çift Kapak Boy', p1:'P1 - Monoblok Lavabo'}; // P1 (2026-10-16): yere basan monoblok kolon lavabo (marin kontra gövde + porselen kaplama) — model hazırlanıyor
 /* H: askıda gövde yüksekliği; base:true (bazalı) modülde yerden tezgah altına, baza dahil */
 const TYPES = {
   c1_30:{cat:'c1', label:'C1 · 30 cm', short:'C1-30', H:300},
@@ -364,9 +367,27 @@ const TYPES = {
   b2:{cat:'b2', label:'B2 - Çift Kapak Boy', short:'B2', H:1200, Hmin:800, Hmax:1800, W:600, Wmin:600, Wmax:1000, Wstep:100, D:350, tall:true, pair:true}, // duvara asılı, iki gövde, yan yana iki kapak (sol/sağ menteşe), gola ise ortada dikey
   b1k150:{cat:'b1', label:'B1 - Kiler 150', short:'B1-K150', H:1500, Hmin:1500, Hmax:1500, W:450, Wmin:450, Wmax:450, D:565, tall:true, pantry:true, trays:4, tg:{set:'1450–1700 mm', frame:['90006622', '4 kiler çerçevesi 400/450 mm']}}, // KİLER MEKANİZMALI BOY DOLAP (2026-10-09): en 45 / derinlik 56,5 (arkalık 25 mm içeride, kullanıcı kararı) / boy SABİT; Vauth-Sagel VS TAL Gate Planero Lava, 4 sepet
   b1k175:{cat:'b1', label:'B1 - Kiler 175', short:'B1-K175', H:1750, Hmin:1750, Hmax:1750, W:450, Wmin:450, Wmax:450, D:565, tall:true, pantry:true, trays:5, tg:{set:'1700–1950 mm', frame:['90007481', '5 kiler çerçevesi 500 mm']}}, // 175 cm: VS TAL Gate 1700–1950 mm seti, 5 Planero sepet (makroaks.com.tr ürün listesi)
+  p1b:{cat:'p1', label:'P1 - Blok Tezgah', short:'P1-B', H:120, Hmin:100 /* en az 10 cm (kullanıcı) */, Hmax:300, W:800, Wmin:400, Wmax:1200, Wstep:50, D:505, tall:true, blk:true}, // BLOK TEZGAH (2026-10-16): yalnız tezgah — marin kontra kutu + dört yanı, üstü ve altı porselen; m.height = blok yüksekliği (kalınlık), üst yüz tezgah kotunda; boy dolap gibi dizilimin ucunda
+  p1:{cat:'p1', label:'P1 - Kolon Lavabo', short:'P1', H:900, Hmin:900, Hmax:900, W:600, Wmin:500, Wmax:900, Wstep:50, D:500, tall:true, col:true}, // genişlik 50–90 cm (kullanıcı 2026-10-16) // bitiş 90 yükseklik × 50 derinlik (kullanıcı) // MONOBLOK KOLON LAVABO (2026-10-16): yere basar, ölçüler BİTİŞ (porselen dahil); şimdilik yalnız marin kontra iskelet (COL, colCore)
   b1w:{cat:'b1', label:'B1 - Çamaşır', short:'B1-Ç', H:1500, Hmin:1250, Hmax:1800, Hopts:[1250, 1300, 1400, 1500, 1600, 1700, 1800], W:450, Wmin:300, Wmax:600, Wopts:[300, 400, 450, 600], D:565, tall:true, wash:true} // ÇAMAŞIR SEPETLİ BOY DOLAP (2026-10-09): altta Vauth-Sagel ENVI Space XX Pro raylı çamaşır sepeti (çekmece kapak), arada gola, üstte raflı menteşeli kapak; derinlik 56,5 SABİT (arkalık 25 mm içeride; kullanıcı kararı)
 };
 const isTall = m => !!(TYPES[m.type] && TYPES[m.type].tall);
+/* P1 KOLON LAVABO (kullanıcının çizimi, 2026-10-16): yere basan kare kolon, 12 mm MARİN KONTRA iskelet, dışı 6 mm porselen + 2 mm yapıştırıcı
+   (ör. 60 cm bitiş → iskelet 60 − 2 × 8 = 58,4 cm). İskelet: ön yüz tam en ve boy, iki yan arada, arka yüz TERS U (iki ayak + üst kayıt; ayaklar arası
+   yerden açık — tesisat), üst ağız açık, hazne tabanı yan duvarların arasında kenarın `basin` mm altında, ortasında sifon deliği. Boy dolap gibi dizilimin ucunda durur (tall + col).
+   Kullanıcı 2026-10-16: ARKASI DA PORSELEN (iskelet derinliği D − 16); ALTINDA 5 mm PABUÇ (PABUC; 4 adet); üst kenar porselenle kapanır → iskelet boyu H − 5 − 8, iskelet yerden 5 mm'de başlar */
+const isCol = m => !!(TYPES[m.type] && TYPES[m.type].col);
+const isBlk = m => !!(TYPES[m.type] && TYPES[m.type].blk); // P1 blok tezgah
+const isPor = m => isCol(m) || isBlk(m); // porselen kaplı P1 modülleri: kapama yok, Malzeme'de porselen rengi, Tezgah / Kapama sekmesi yok
+/* 45° gönyeli plaka: kutu (w × h × d), ince ekseni `axis`; iç yüzü (inSign tarafı) diğer iki eksende P kadar içeri → kapalı kutuda bütün kenarlar gönye */
+function miterPlate(w, h, d, axis, inSign, P){
+  const geo = new THREE.BoxGeometry(w, h, d).toNonIndexed(), p = geo.attributes.position, ai = {x: 0, y: 1, z: 2}[axis];
+  for (let k = 0; k < p.count; k++){ const v = [p.getX(k), p.getY(k), p.getZ(k)];
+    if (Math.sign(v[ai]) === inSign){ for (let j = 0; j < 3; j++) if (j !== ai) v[j] -= Math.sign(v[j])*P; p.setXYZ(k, v[0], v[1], v[2]); } }
+  geo.computeVertexNormals(); return geo;
+}
+const COL = {t:12, clad:6, glue:2, basin:120 /* bitmiş hazne derinliği 12 cm (kullanıcı 2026-10-16) */, ledge:80, ledgeDrop:20 /* batarya etejeri: 8 cm derin, üst çerçeveden 2 cm aşağıda */, faucetVh:40 /* batarya gövdesi kısa (vfBodyH) */, hole:200, leg:120, lintel:200, pabuc:4};
+const colCore = m => { const p = COL.clad + COL.glue, T = TYPES[m.type]; return {W: m.width - 2*p, D: T.D - 2*p, H: T.H - PABUC - p, y0: PABUC, p}; };
 const TALL_SPLIT = .5; // iki kapak eşit yükseklikte (kapak arası boşluk gövde ortasında)
 /* B1 Çamaşır (kullanıcı kararı 2026-10-09): modülün altından ÜST KAPAĞIN ALTINA kadar HEP WASH_LOW (700 mm); gola ortası bunun 15 mm altında (kapak ile gola arası).
    Boy değişince yalnız üst kapak uzar / kısalır. Alt bölme: sepet 550 + ray / çerçeve / sürgülü üst kapak payı sığar */
@@ -420,7 +441,9 @@ const LAYOUTS = {
       {id:'ke', name:'Elcikli', parts:[], doors:true, hMin:1200}], // TEK gövde, yan yana iki boy kapak, elcik tek kapakta (m.elcikSide), 120 cm'den başlar, kapak arası 3 mm
   b1k150:[{id:'kg', name:'Kiler · 4 sepet', parts:[], doors:true}], // B1 Kiler: tek kapak, içinde VS TAL Gate Planero
   b1k175:[{id:'kg', name:'Kiler · 5 sepet', parts:[], doors:true}],
-  b1w:[{id:'kw', name:'Çamaşır sepetli', parts:[], doors:true}] // alt: çamaşır sepeti çekmecesi, üst: raflı kapak, arada gola
+  b1w:[{id:'kw', name:'Çamaşır sepetli', parts:[], doors:true}],
+  p1:[{id:'col', name:'Kolon lavabo', parts:[], doors:true}],
+  p1b:[{id:'blk', name:'Blok tezgah', parts:[], doors:true}] // alt: çamaşır sepeti çekmecesi, üst: raflı kapak, arada gola
 };
 /* boy dolap tek kapaklı mı; tek kapakta ortada gola olamaz: gola seçimi push-open gibi davranır */
 const tallPantry = m => !!(TYPES[m.type] && TYPES[m.type].pantry); // B1 Kiler: tek kapak + VS TAL Gate, raf / iç çekmece yok
@@ -494,7 +517,7 @@ function tallInterior(m, c = cfg){
   return out([], [[T, H - T, 2*nh + 1]]);
 }
 const tallHandleOf = (m, c = cfg) => tallElcik(m) ? 'elcik' : tallGolaOnly(m) ? 'kanal' : tallNoGola(m) && m.handle === 'kanal' ? 'push' : (m.handle || c.handle); // boy dolapta tutamak modüle özel (m.handle)
-const partsTxt = (L, sep = ' · ') => L.doors ? (L.id === 'k1' ? 'tek boy kapak' : L.id === 'kg' ? 'tek kapak · VS TAL Gate Planero' : L.id === 'kw' ? 'çamaşır sepeti · gola · raflı kapak' : L.id === 'kc' ? 'sol · sağ kapak · gola' : L.id === 'ke' ? 'sol · sağ kapak · elcik' : 'üst · alt kapak') : L.parts.map(p => p === 'R' ? 'alt' : p === 'E' ? 'eşit' : p).join(sep);
+const partsTxt = (L, sep = ' · ') => L.doors ? (L.id === 'col' || L.id === 'blk' ? 'marin kontra · porselen' : L.id === 'k1' ? 'tek boy kapak' : L.id === 'kg' ? 'tek kapak · VS TAL Gate Planero' : L.id === 'kw' ? 'çamaşır sepeti · gola · raflı kapak' : L.id === 'kc' ? 'sol · sağ kapak · gola' : L.id === 'ke' ? 'sol · sağ kapak · elcik' : 'üst · alt kapak') : L.parts.map(p => p === 'R' ? 'alt' : p === 'E' ? 'eşit' : p).join(sep);
 /* eski tipler (Askı 30/45/60): askı kalır — 1 çekmece C1, 2+ çekmece C2-60; eski bazalı 'Boy' (floor) C3-85 */
 const OLD_PARTS = {w30:{'1':1,'2':2}, w45:{'1':1,'2':2,'3':3,'2d':2}, w60:{'1':1,'2':2,'3':3,'4':4,'3d':3,'2d':2}};
 function migrateTypes(c){
@@ -610,7 +633,7 @@ const KANAL_FIN = {alu:'Alüminyum', front:'Ahşap'};
 const handleText = (c, h, col, fin) => h === 'kulp' ? `${HANDLES.kulp} · ${(HANDLE_COLORS[col] || HANDLE_COLORS.krom).label}`
  : h === 'elcik' ? 'Elcik' : h === 'kanal' ? `${HANDLES.kanal} · ${fin === 'front' ? 'Ahşap (' + colorName(c.front.mat, c.front.color) + ')' : 'Alüminyum (siyah)'}` : HANDLES[h];
 const handleColorText = c => handleText(c, c.handle, c.handleColor, c.kanalFin)
-  + (() => { const ts = [...new Set((c.modules || []).filter(isTall).map(m => handleText(c, tallHandleOf(m, c), m.handleColor || c.handleColor, m.kanalFin || c.kanalFin)))]; return ts.length ? ' · boy dolap: ' + ts.join(' / ') : ''; })();
+  + (() => { const ts = [...new Set((c.modules || []).filter(m => isTall(m) && !isPor(m)).map(m => handleText(c, tallHandleOf(m, c), m.handleColor || c.handleColor, m.kanalFin || c.kanalFin)))]; return ts.length ? ' · boy dolap: ' + ts.join(' / ') : ''; })();
 /* ORGANİZER DÜZENLERİ (kullanıcının elle çizimi, 2026-10-15): üstten bakış, bölmeler çerçevenin içinde.
    lines: [eksen, konum, baş, son] — 'x' = BOYUNA bölme (önden arkaya), u = konum soldan (0–1), v aralığı; 'z' = ENİNE bölme (soldan sağa), v = konum (0 ön, 1 arka), u aralığı.
    Hangi düzenler seçilebilir: modül genişliğine göre (ORG_SETS); çapraz bölmeler geçme (yarım kertme) ile birleşir */
@@ -777,6 +800,8 @@ const matT = k => MATS[k].t;
 function moduleDims(m, c = cfg){
   const topY = topH(c) - topT(c);
   const T = TYPES[m.type];
+  if (T.col) return {H: T.H, bottomY: 0, topY: T.H}; // kolon lavabo yere basar (bitiş yüksekliği)
+  if (T.blk){ const top = topH(c), h = m.height || T.H; return {H: h, bottomY: top - h, topY: top}; } // blok tezgah: üst yüzü tezgah kotunda, aşağı doğru m.height
   if (T.tall){ const b = m.bottom != null ? m.bottom : TALL_BOTTOM, h = m.height || T.H; return {H: h, bottomY: b, topY: b + h}; } // duvara asılı boy dolap, yükseklik modülde (m.height)
   if (T.base) return {H: T.H - PLINTH, bottomY: PLINTH, topY: T.H}; // bazalı: gövde tezgahtan bağımsız sabit
   return {H: T.H, bottomY: topY - T.H, topY};
@@ -923,7 +948,25 @@ function normalize(c = cfg){
       else { if (s.t === 9) s.t = 8; if (s.t === 19) s.t = 18; }
       s.mat = sideMatKey(c);
       if (!SIDE_SHAPES[s.shape]) s.shape = 'L'; if (s.t < SIDE_JU_MIN && s.shape !== 'L') s.shape = 'L'; }); // dönüş şekli: J/U en az 19 mm
-    if (isTall(m)){ // boy dolap: ölçü sabit, menteşe sol/sağ, alt kenar yerden ayarlı
+    if (isBlk(m)){ // blok tezgah: en ve yükseklik (kalınlık) ayarlı, kapama yok; porselen rengi modüle özel
+      const Tb = TYPES[m.type]; m.width = clamp(Math.round(m.width/Tb.Wstep)*Tb.Wstep, Tb.Wmin, Tb.Wmax);
+      m.height = clamp(Math.round((+m.height || Tb.H)/10)*10, Tb.Hmin, Tb.Hmax); m.hidden = false; m.sides.left.on = m.sides.right.on = false;
+      if (!TOPS.some(t => t.id === m.color)) m.color = c.top.color; if (!TOP_SURF[m.surf]) m.surf = 'mat';
+      // lavabo (kolon lavabo gibi, porselen entegre hazne): yok / entegre; hazne eni 30 cm – (blok − 2 × 4 cm), kayma kenarlarda en az 4 cm bırakır
+      if (m.sink !== 'entegre') m.sink = 'yok';
+      m.sw = clamp(Math.round((+m.sw || 500)/10)*10, 300, m.width - 80);
+      { const lim = Math.max(0, (m.width - m.sw)/2 - 40); m.so = clamp(Math.round((+m.so || 0)/10)*10, -lim, lim); }
+      if (!DRAINS[m.drain]) m.drain = 'zarf'; if (m.faucet !== 'duvar') m.faucet = 'tezgah';
+    }
+    else if (isCol(m)){ // kolon lavabo: yere basar, yükseklik sabit, kapama / gizli çekmece yok
+      const Tc = TYPES[m.type]; m.width = clamp(Math.round(m.width/Tc.Wstep)*Tc.Wstep, Tc.Wmin, Tc.Wmax); m.height = Tc.H; m.bottom = 0; m.hidden = false;
+      m.sides.left.on = m.sides.right.on = false;
+      if (!DRAINS[m.drain]) m.drain = 'zarf'; // hazne gider tipi (entegre eviyedeki gibi)
+      if (!TOPS.some(t => t.id === m.color)) m.color = c.top.color; // porselen rengi KOLONA ÖZEL (ilk konulduğunda tezgah rengi; sonra tezgahtan bağımsız)
+      if (!TOP_SURF[m.surf]) m.surf = 'mat';
+      if (m.faucet !== 'duvar') m.faucet = 'tezgah'; // batarya: etejerde tezgah üstü (varsayılan) ya da duvardan (etejer yok)
+    }
+    else if (isTall(m)){ // boy dolap: ölçü sabit, menteşe sol/sağ, alt kenar yerden ayarlı
       { const Tw = TYPES[m.type], st = Tw.Wstep || W_STEP; m.width = clamp(Math.round(m.width/st)*st, Tw.Wmin, Tw.Wmax); } m.hidden = false; // B1 30–50 cm 5 cm adım, B2 60–100 cm 10 cm adım
       m.height = clamp(Math.round((+m.height || TYPES[m.type].H)/50)*50, TYPES[m.type].Hmin, TYPES[m.type].Hmax); // 5 cm hassasiyet (B1 Çamaşır 125); diğerleri aşağıda 10 cm
       { const Tw = TYPES[m.type], near = (opts, v) => opts.reduce((a, b) => Math.abs(b - v) < Math.abs(a - v) ? b : a); // izinli değerler listesi olan tiplerde en yakına (B1 Çamaşır)
@@ -1083,6 +1126,60 @@ function cutList(c = cfg){
   };
   c.modules.forEach((m,i) => {
     const mod = 'M' + (i+1), W = m.width, {H} = moduleDims(m, c), hs = drawerHeights(m, c);
+    if (isBlk(m)){ // P1 blok tezgah: marin kontra kutu (her kenar 45° gönye) + dışı 6 mm porselen (her kenar 45° gönye); 3B: buildBlock
+      const p = COL.clad + COL.glue, t = COL.t, Tb = TYPES[m.type], Hb = m.height, D = Tb.D, Wc = W - 2*p, Dc = D - 2*p, Hc = Hb - 2*p;
+      const nm = 'Marin kontra 12 mm', pn = `Porselen ${COL.clad} mm · ${topById(m.color).name} · ${TOP_SURF[m.surf].label}`, g4 = 'dört kenarı 45° gönye';
+      push('Blok · kontra üst / alt', mod, 2, Wc, Dc, t, nm, 'marin12', `Bitiş ${W} × ${D} × ${Hb} mm − her yüzde ${COL.clad} porselen + ${COL.glue} yapıştırıcı · ${g4}`);
+      push('Blok · kontra ön / arka', mod, 2, Wc, Hc, t, nm, 'marin12', g4);
+      push('Blok · kontra yan', mod, 2, Dc, Hc, t, nm, 'marin12', g4);
+      const bs = blkSink(m), hole = bs ? ` · lavabo deliği ${m.sw} × ${INT_D} mm (önden ${INT_FRONT} mm, ortadan ${m.so ? (m.so > 0 ? 'sağa ' : 'sola ') + Math.abs(m.so) + ' mm' : 'ortalı'})` : '';
+      if (bs){ rows[rows.length - 3].note += ` · üstte delik ${m.sw + 2*p} × ${INT_D + 2*p} mm (hazne + kaplama payı)`; }
+      push('Blok porselen · üst', mod, 1, W, D, COL.clad, pn, 'pors6', `${g4} · iskeletle arası ${COL.glue} mm yapıştırıcı${hole}`);
+      push('Blok porselen · alt', mod, 1, W, D, COL.clad, pn, 'pors6', g4);
+      push('Blok porselen · ön / arka', mod, 2, W, Hb, COL.clad, pn, 'pors6', g4);
+      push('Blok porselen · yan', mod, 2, D, Hb, COL.clad, pn, 'pors6', g4);
+      if (bs){ // porselen entegre hazne (kolon lavabo gibi): buildBasin ile aynı
+        push('Blok porselen · hazne ön / arka duvarı', mod, 2, m.sw + 2*COL.clad, blkDepth(m), COL.clad, pn, 'pors6', `İç kaplama · üst plakanın altına kadar · ${blkDepth(m)} mm derin hazne`);
+        push('Blok porselen · hazne yan duvarı', mod, 2, INT_D, blkDepth(m), COL.clad, pn, 'pors6', 'İç kaplama · ön / arka duvarların arasında');
+        push('Blok porselen · hazne tabanı', mod, 1, m.sw, INT_D, COL.clad, pn, 'pors6', `${DRAINS[m.drain]} · bitmiş hazne ${m.sw} × ${INT_D} × ${blkDepth(m)} mm${blkDepth(m) + COL.clad > Hb ? ' · hazne bloğun altına sarkar' : ''}`);
+        hw.push({item:`Blok tezgah lavabo gideri · ${DRAINS[m.drain]} (porselen kapaklı)`, mod, qty:1, price:PRICE.drain[m.drain] ?? 0});
+        hw.push({item: m.faucet === 'duvar' ? 'Duvardan çıkışlı ankastre batarya (krom)' : 'Tezgah üstü batarya (haznenin arkasında, krom)', mod, qty:1, price:0});
+      }
+      hw.push({item:'Blok tezgah duvar montaj konsolu (gizli)', mod, qty: W > 800 ? 3 : 2, price:0});
+      return;
+    }
+    if (isCol(m)){ // P1 kolon lavabo: marin kontra iskelet (3B ile aynı: buildColumn); porselen kaplama sonra eklenecek
+      const cc = colCore(m), t = COL.t, nm = 'Marin kontra 12 mm', key = 'marin12';
+      push('Kolon · ön yüz', mod, 1, cc.H, cc.W, t, nm, key, `Tam en ve boy · bitiş ${W} × ${TYPES[m.type].D} × ${TYPES[m.type].H} mm − her kaplı yüzde ${COL.clad} porselen + ${COL.glue} yapıştırıcı (yanlar, ön, arka, üst) − altta ${PABUC} mm pabuç`);
+      hw.push({item:`Pabuç Ø7 × ${PABUC} mm · kolon lavabo altı (yan duvarların altında, önden / arkadan 100 mm)`, mod, qty: COL.pabuc, price:0});
+      rows[rows.length - 1].note += ' · iki dikey kenarı 45° gönye';
+      push('Kolon · yan', mod, 2, cc.H, cc.D, t, nm, key, 'Tam derinlik · iki dikey kenarı 45° gönye (ön ve arkayla)');
+      push('Kolon · arka yüz', mod, 1, cc.H, cc.W, t, nm, key, `Tek parça, ters U kesim: alttan ortada ${cc.W - 2*COL.leg} × ${cc.H - COL.lintel} mm açıklık (tesisat; yanlarda ${COL.leg} mm ayak, üstte ${COL.lintel} mm) · iki dikey kenarı 45° gönye`);
+      push('Kolon · hazne tabanı', mod, 1, cc.W - 2*t, cc.D - 2*t, t, nm, key, `Yanların arasında, üst kenardan ${COL.basin} mm aşağıda · ortada Ø${COL.hole} sifon deliği`);
+      // porselen kaplama (3B: buildColumnClad) — renk şimdilik tezgah rengi; dış köşeler 45° gönye
+      const Tc = TYPES[m.type], P = COL.clad, ph = Tc.H - PABUC, pn = `Porselen ${P} mm · ${topById(m.color).name} · ${TOP_SURF[m.surf].label || m.surf}`, rw = 2*cc.p + t; // çerçeve eni: dış kaplama payı + iskelet duvarı + iç kaplama payı (60 cm'de 28 mm)
+      const iw = W - 2*rw, idp = Tc.D - 2*rw; // bitmiş hazne iç ölçüsü
+      push('Kolon porselen · ön yüz', mod, 1, ph, W, P, pn, 'pors6', `Pabuç üstünden üst kenara · iki dikey kenar ve üst kenar 45° gönye · iskeletle arası ${COL.glue} mm yapıştırıcı`);
+      push('Kolon porselen · yan', mod, 2, ph, Tc.D, P, pn, 'pors6', 'İki dikey kenar ve üst kenar 45° gönye');
+      push('Kolon porselen · arka yüz', mod, 1, ph, W, P, pn, 'pors6', `Tek parça ters U · alttan ortada ${cc.W - 2*COL.leg} × ${cc.y0 + cc.H - COL.lintel - PABUC} mm açıklık · iki dikey kenar ve üst kenar 45° gönye`);
+      push('Kolon porselen · üst çerçeve (ön / arka)', mod, 2, W, rw, P, pn, 'pors6', `Üst kenar · dış kenarı ve iki ucu 45° gönye · eni ${rw} mm (${cc.p} dış kaplama + ${t} iskelet + ${cc.p} iç kaplama), iç kaplamanın üstünü de örter`);
+      push('Kolon porselen · üst çerçeve (yan)', mod, 2, Tc.D, rw, P, pn, 'pors6', 'Üst kenar · dış kenarı ve iki ucu 45° gönye');
+      // hazne içi (3B: buildBasin): ön / arka duvar yanların üstünden geçer, taban duvarların arasında; gider tipi entegre eviyedeki gibi
+      const ledge = m.faucet !== 'duvar', LG = ledge ? COL.ledge : 0, LD = COL.ledgeDrop, hd = idp - LG; // etejerli: hazne etejerin önünden başlar
+      push('Kolon porselen · hazne ön duvarı', mod, 1, iw + 2*P, COL.basin, P, pn, 'pors6', `İç kaplama · iskeletle arası ${COL.glue} mm yapıştırıcı · üst çerçevenin altına kadar`);
+      if (ledge) push('Kolon porselen · etejer alnı (hazne arka duvarı)', mod, 1, iw + 2*P, COL.basin - LD, P, pn, 'pors6', `Haznenin arkası · etejerin altına kadar`);
+      else push('Kolon porselen · hazne arka duvarı', mod, 1, iw + 2*P, COL.basin, P, pn, 'pors6', 'İç kaplama · üst çerçevenin altına kadar (duvardan bataryada etejer yok)');
+      push('Kolon porselen · hazne yan duvarı', mod, 2, hd, COL.basin, P, pn, 'pors6', ledge ? 'İç kaplama · ön duvarla etejer alnının arasında' : 'İç kaplama · ön ve arka duvarın arasında');
+      push('Kolon porselen · hazne tabanı', mod, 1, iw, hd, P, pn, 'pors6', `${DRAINS[m.drain]} · bitmiş hazne ${iw} × ${hd} × ${COL.basin} mm derin`);
+      if (ledge){
+        push('Kolon porselen · etejer üstü', mod, 1, iw, LG, P, pn, 'pors6', `Batarya etejeri · üst çerçeveden ${LD} mm aşağıda, ${LG} mm derin · tezgah üstü batarya deliği ortada`);
+        push('Kolon porselen · etejer üstü arka şerit', mod, 1, iw + 2*P, LD - P, P, pn, 'pors6', 'Etejerin üstünde, üst çerçevenin altına kadar');
+        push('Kolon porselen · etejer üstü yan şerit', mod, 2, LG, LD - P, P, pn, 'pors6', 'Etejerin üstünde, yanlarda');
+      }
+      hw.push({item:`Kolon lavabo gideri · ${DRAINS[m.drain]} (porselen kapaklı)`, mod, qty:1, price:PRICE.drain[m.drain] ?? 0});
+      hw.push({item: ledge ? 'Tezgah üstü batarya (etejerde, krom)' : 'Duvardan çıkışlı ankastre batarya (krom)', mod, qty:1, price:0});
+      return;
+    }
     if (isTall(m) && tallElcik(m)){ // B2 elcikli: TEK gövde, yan yana iki kapak (sol/sağ menteşe, arası 3 mm), elcik yalnız bir kapakta (m.elcikSide)
       const Dt = TYPES[m.type].D, cdt = Dt - fT, nSh = tallIdrParts(m, mod, W, cdt), dH = H - 3, DW = (doorFit(m).dw - 3)/2;
       push('Yan dikme', mod, 2, H, cdt, T, bName, bKey, 'Boy dolap (elcikli, tek gövde)' + bGrainV);
@@ -1391,8 +1488,10 @@ function coreMat(){
     return new THREE.MeshStandardMaterial({color: c.convertSRGBToLinear(), roughness: Math.min(.95, TOP_SURF[s].r + .2), metalness:0, envMapIntensity:.2});
   });
 }
-function topMat(double){
-  const t = topById(cfg.top.color), s = cfg.top.surf;
+function topMat(double){ return stoneMat(cfg.top.color, cfg.top.surf, double); }
+/* porselen plaka malzemesi (tezgah ve kolon lavabo; kolon lavabonun rengi kendine özel: m.color / m.surf) */
+function stoneMat(id, surf, double){
+  const t = topById(id), s = TOP_SURF[surf] ? surf : 'mat';
   return std(`t_${t.id}_${s}_${double ? 'd' : ''}`, () => {
     // tezgah pozlaması: doku %18 karartılır, yansıma azaltılır
     const m = new THREE.MeshStandardMaterial({map: stoneTex(t), color: srgb(TOP_EXPOSURE), roughness: Math.min(.95, TOP_SURF[s].r + .12), metalness:0, envMapIntensity: s === 'parlak' ? .5 : .22, side: double ? THREE.DoubleSide : THREE.FrontSide});
@@ -1702,7 +1801,7 @@ function buildScene(){
   buildRoom(mx.total);
   // tezgah altına sarkan entegre haznelerin hacmi: gövde parçaları bu hacme girmez (çentiklenir)
   basinCut = intRanges(c, mx).filter(r => r.s.depth + 12 > c.top.t).map(r => ({x0: r.x0 - 14, x1: r.x1 + 14, z0: r.z0 - 14, z1: r.z1 + 14, yb: TOTAL_H - r.s.depth - 12 - 4}));
-  c.modules.forEach((m, i) => (isTall(m) ? buildTall : buildModule)(m, mx.map[m.uid].x0, i, mx));
+  c.modules.forEach((m, i) => (isBlk(m) ? buildBlock : isCol(m) ? buildColumn : isTall(m) ? buildTall : buildModule)(m, mx.map[m.uid].x0, i, mx));
   buildPlinths(mx);
   if (ctrMods(c).length && hasTop(c)) buildTop(mx);
   c.sinks.forEach(s => buildSink(s, mx));
@@ -2006,6 +2105,143 @@ function washBin(par, w, d, h, x, y0, z, rimMat){
   const hb = cyl(4, w*.55, rimMat, g, 'x'); hb.position.set(0, h + 6, d/2 - 14);                    // taşıma sapı (yatık)
   [-1, 1].forEach(s => { const e = cyl(4, 14, rimMat, g, 'z'); e.position.set(s*w*.275, h + 6, d/2 - 7); });
   return g;
+}
+/* P1 BLOK TEZGAH: duvara asılı kalın tezgah bloğu — içte 12 mm marin kontra kapalı kutu, dışta 6 mm porselen (aralarında 2 mm yapıştırıcı, çizilmez);
+   iki kabukta da bütün kenarlar 45° gönye (miterPlate). Üst yüz tezgah kotunda, arka yüz duvarda */
+function buildBlock(m, x0){
+  const T = TYPES[m.type], W = m.width, D = T.D, {H, bottomY} = moduleDims(m), P = COL.clad, p = COL.clad + COL.glue, t = COL.t;
+  const g = new THREE.Group(); g.userData.mod = m.uid; root.add(g);
+  const pm = stoneMat(m.color, m.surf), km = M.marin || (M.marin = new THREE.MeshStandardMaterial({color: srgb('#d6bf96'), roughness:.85, metalness:0, envMapIntensity:.4}));
+  const uvMap = ms => { const geo = ms.geometry, ps = geo.attributes.position, uv = geo.attributes.uv, n = geo.attributes.normal;
+    for (let k = 0; k < ps.count; k++){ const x = ps.getX(k) + ms.position.x - x0, y = ps.getY(k) + ms.position.y, z = ps.getZ(k) + ms.position.z;
+      const down = bottomY + H - y; // desen üst yüz kenarından aşağı kesintisiz (tezgah gibi, slabUV)
+      uv.setXY(k, ...(Math.abs(n.getY(k)) > .5 ? [z/SLAB_W, x/SLAB_L] : Math.abs(n.getX(k)) > .5 ? [z/SLAB_W, (x + down)/SLAB_L] : [(z + down)/SLAB_W, x/SLAB_L])); }
+    uv.needsUpdate = true; };
+  // LAVABO (kullanıcı 2026-10-16, kolon gibi): m.sink 'entegre' → üst plakalar oyuk (delik), içte porselen hazne (buildBasin, gider m.drain), batarya m.faucet
+  const bs = blkSink(m, x0), top = bottomY + H;
+  // üst plaka deliği varsa: önden bakış yerine üstten şekil (delikli) çekilir, alt yüzün dış kenarı th kadar içeri (gönye)
+  // bottom: alt plaka (iç yüzü üstte); hazne bloğun altına iniyorsa alt plakalar da delinir, hazne duvarları içinden geçer
+  const holedTop = (bx0, bx1, bz0, bz1, th, hl, mat, uv, bottom) => { const s = new THREE.Shape(); s.moveTo(bx0, -bz0); s.lineTo(bx1, -bz0); s.lineTo(bx1, -bz1); s.lineTo(bx0, -bz1); s.lineTo(bx0, -bz0);
+    const hp = new THREE.Path(); hp.moveTo(hl.x0, -hl.z0); hp.lineTo(hl.x0, -hl.z1); hp.lineTo(hl.x1, -hl.z1); hp.lineTo(hl.x1, -hl.z0); hp.lineTo(hl.x0, -hl.z0); s.holes.push(hp);
+    const geo = new THREE.ExtrudeGeometry(s, {depth: th, bevelEnabled: false}).toNonIndexed(), q = geo.attributes.position, inZ = bottom ? th : 0;
+    for (let k = 0; k < q.count; k++) if (Math.abs(q.getZ(k) - inZ) < 1e-6){ const x = q.getX(k), z = -q.getY(k);
+      if (Math.abs(x - bx0) < 1e-6) q.setX(k, bx0 + th); else if (Math.abs(x - bx1) < 1e-6) q.setX(k, bx1 - th);
+      if (Math.abs(z - bz0) < 1e-6) q.setY(k, -(bz0 + th)); else if (Math.abs(z - bz1) < 1e-6) q.setY(k, -(bz1 - th)); }
+    geo.computeVertexNormals(); const ms = new THREE.Mesh(geo, mat); ms.rotation.x = -Math.PI/2; return ms; };
+  // kabuk: dış ölçü (bx0..bx1, by0..by1, bz0..bz1), plaka kalınlığı th; hl: üst plakadaki lavabo deliği
+  const shell = (bx0, bx1, by0, by1, bz0, bz1, th, mat, uv, hl, hlB) => { const w = bx1 - bx0, h = by1 - by0, d = bz1 - bz0, cx = (bx0 + bx1)/2, cy = (by0 + by1)/2, cz = (bz0 + bz1)/2;
+    [[hl, false, by1 - th], [hlB, true, by0]].forEach(([hh, bot, py]) => { if (!hh) return; const ms = holedTop(bx0, bx1, bz0, bz1, th, hh, mat, uv, bot); ms.position.y = py; ms.updateMatrix(); ms.castShadow = ms.receiveShadow = true;
+      if (uv){ const ps = ms.geometry.attributes.position, uvA = ms.geometry.attributes.uv; for (let k = 0; k < ps.count; k++) uvA.setXY(k, -ps.getY(k)/SLAB_W, (ps.getX(k) - x0)/SLAB_L); uvA.needsUpdate = true; }
+      addEdges(ms, 20); g.add(ms); });
+    [...(hl ? [] : [[miterPlate(w, th, d, 'y', -1, th), cx, by1 - th/2, cz]]), ...(hlB ? [] : [[miterPlate(w, th, d, 'y', 1, th), cx, by0 + th/2, cz]]),
+     [miterPlate(w, h, th, 'z', -1, th), cx, cy, bz1 - th/2], [miterPlate(w, h, th, 'z', 1, th), cx, cy, bz0 + th/2],
+     [miterPlate(th, h, d, 'x', 1, th), bx0 + th/2, cy, cz], [miterPlate(th, h, d, 'x', -1, th), bx1 - th/2, cy, cz]].forEach(([geo, px, py, pz]) => {
+      const ms = new THREE.Mesh(geo, mat); ms.position.set(px, py, pz); ms.castShadow = ms.receiveShadow = true; if (uv) uvMap(ms); addEdges(ms, 20); g.add(ms); }); };
+  // hazne tabanının altı (porselen taban dahil) blok plakalarının altına iniyorsa alt plakalar da delinir (hazne bloğun altından sarkar, tezgahtaki eviye gibi)
+  const yFb = top - blkDepth(m) - P, cH = bs && {x0: bs.x0 - p, x1: bs.x1 + p, z0: bs.z0 - p, z1: bs.z1 + p}, pH = bs && {x0: bs.x0 - P, x1: bs.x1 + P, z0: bs.z0 - P, z1: bs.z1 + P};
+  shell(x0 + p, x0 + W - p, bottomY + p, bottomY + H - p, p, D - p, t, km, false, cH, bs && yFb < bottomY + p + t ? cH : null); // marin kontra iskelet (içte; delik hazne + kaplama payı)
+  shell(x0, x0 + W, bottomY, bottomY + H, 0, D, P, pm, true, bs, bs && yFb < bottomY + P ? pH : null);                          // porselen kabuk
+  if (!bs) return;
+  buildBasin({x0: bs.x0, x1: bs.x1, z0: bs.z0, z1: bs.z1, s: {drain: m.drain, depth: blkDepth(m)}}, g, x0, {top, t: P, wt: P, mat: pm, matD: stoneMat(m.color, m.surf, true)});
+  const cx = (bs.x0 + bs.x1)/2;
+  if (m.faucet === 'duvar') wallFaucet(cx, top + 150, bs.z0 + 70, g);                 // duvardan çıkışlı
+  else { const fg = new THREE.Group(); fg.position.y = top - TOTAL_H; g.add(fg); vesselFaucet(cx, bs.z0/2, fg, COL.faucetVh); } // tezgah üstü: haznenin arkasında, blok üstünde
+}
+/* blok tezgahın lavabosu (m.sink 'entegre'): hazne en m.sw, ortadan kayma m.so; ön-arka INT_D (300), ön kenardan INT_FRONT (70) geride — tezgahtaki porselen eviye gibi */
+const blkDepth = m => clamp((m.height || 120) - 20, 80, 120); // blok lavabosunun hazne derinliği bloğa göre: 10 cm blokta 8, 14 cm ve üstünde en fazla 12 cm (kullanıcı 2026-10-16)
+const blkSink = (m, x0 = 0) => m.sink === 'entegre' ? (() => { const D = TYPES[m.type].D, cx = x0 + m.width/2 + (+m.so || 0); return {x0: cx - m.sw/2, x1: cx + m.sw/2, z0: D - INT_FRONT - INT_D, z1: D - INT_FRONT}; })() : null;
+/* P1 kolon lavabo — şimdilik yalnız MARİN KONTRA iskelet (parça listesiyle aynı); iskelet bitiş ölçüsünün içinde ortalı (yanlarda ve önde 8 mm kaplama payı), arkası duvarda */
+function buildColumn(m, x0, idx, mx){
+  const cc = colCore(m), t = COL.t, g = new THREE.Group(); g.userData.mod = m.uid; root.add(g);
+  const mat = M.marin || (M.marin = new THREE.MeshStandardMaterial({color: srgb('#d6bf96'), roughness:.85, metalness:0, envMapIntensity:.4})); // marin kontra (açık kayın tonu)
+  // iskelet: yanlarda, önde ve arkada kaplama payı (cc.p) kadar içeride, yerden 5 mm pabuç üstünde
+  const xa = x0 + cc.p, xb = xa + cc.W, cx = (xa + xb)/2, H = cc.H, y0 = cc.y0, za = cc.p, D = cc.D, zb = za + D, ym = y0 + H/2;
+  // BİRLEŞİM (kullanıcının çizimi): dört dikey köşe 45° GÖNYE — ön, yanlar ve arka ayaklar dış ölçüde tam (üstten kesit çokgenleri dikey çekilir);
+  // arka üst kayıt iki ayağın ARASINDA (düz), hazne tabanı yan duvarların arasında
+  const prismY = pts => { const s = new THREE.Shape(); pts.forEach(([x, z], k) => k ? s.lineTo(x, -z) : s.moveTo(x, -z)); s.lineTo(pts[0][0], -pts[0][1]);
+    const pm = new THREE.Mesh(new THREE.ExtrudeGeometry(s, {depth: H, bevelEnabled: false}), mat); pm.rotation.x = -Math.PI/2; pm.position.y = y0; pm.castShadow = pm.receiveShadow = true; addEdges(pm, 20); g.add(pm); };
+  const L = COL.leg;
+  prismY([[xa, zb], [xb, zb], [xb - t, zb - t], [xa + t, zb - t]]);                               // ön yüz (iki kenarı gönye)
+  prismY([[xa, za], [xa + t, za + t], [xa + t, zb - t], [xa, zb]]);                               // sol yan (önde ve arkada gönye)
+  prismY([[xb, za], [xb, zb], [xb - t, zb - t], [xb - t, za + t]]);                               // sağ yan
+  { // arka yüz TEK PARÇA (kullanıcı): ters U kesimli plaka — önden bakış şekli z yönünde çekilir, iki dış dikey kenar iç yüzde t kadar içeri alınarak 45° gönye
+    const yT = y0 + H, s = new THREE.Shape(); [[xa, y0], [xa + L, y0], [xa + L, yT - COL.lintel], [xb - L, yT - COL.lintel], [xb - L, y0], [xb, y0], [xb, yT], [xa, yT]].forEach(([x, y], k) => k ? s.lineTo(x, y) : s.moveTo(x, y));
+    const bg = new THREE.ExtrudeGeometry(s, {depth: t, bevelEnabled: false}), P = bg.attributes.position;
+    for (let k = 0; k < P.count; k++) if (Math.abs(P.getZ(k) - t) < 1e-6){ const x = P.getX(k); if (Math.abs(x - xa) < 1e-6) P.setX(k, xa + t); else if (Math.abs(x - xb) < 1e-6) P.setX(k, xb - t); }
+    P.needsUpdate = true; bg.computeVertexNormals();
+    const bk = new THREE.Mesh(bg, mat); bk.position.z = za; bk.castShadow = bk.receiveShadow = true; addEdges(bk, 20); g.add(bk);
+  }
+  // 5 mm pabuç: 4 adet, yan duvarların altında, önden ve arkadan 100 mm içeride
+  [xa + t/2, xb - t/2].forEach(x => [za + 100, zb - 100].forEach(z => pabucAt(x, z, g)));
+  // hazne tabanı: yanların arasında, üst kenardan COL.basin aşağıda, ortada sifon deliği
+  const fx0 = xa + t, fx1 = xb - t, fz0 = za + t, fz1 = zb - t, sh = new THREE.Shape();
+  sh.moveTo(fx0, -fz0); sh.lineTo(fx1, -fz0); sh.lineTo(fx1, -fz1); sh.lineTo(fx0, -fz1); sh.lineTo(fx0, -fz0);
+  const hole = new THREE.Path(); hole.absarc(cx, -(fz0 + fz1)/2, COL.hole/2, 0, Math.PI*2, true); sh.holes.push(hole);
+  const fm = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, {depth: t, bevelEnabled: false, curveSegments: 32}), mat);
+  fm.rotation.x = -Math.PI/2; fm.position.y = y0 + H - COL.basin - t; fm.castShadow = fm.receiveShadow = true; addEdges(fm, 20); g.add(fm);
+  buildColumnClad(m, x0, g, cc);
+}
+/* P1 PORSELEN KAPLAMA (2026-10-16): 6 mm porselen, iskeletle arası 2 mm yapıştırıcı (çizilmez). Dış yüzler (ön, iki yan, arka — arka da ters U) pabuç üstünden (y 5)
+   üst kenara kadar; üstte iskeletin üst kenarlarını örten ÇERÇEVE (dıştan iç hazne kenarına). Bütün dış köşeler 45° GÖNYE: dikey köşelerde ve üst kenarda iç yüz 6 mm içeride.
+   Renk şimdilik TEZGAH RENGİ (topMat); doku plaka ölçeğinde, dikey yüzlerde plaka boyu düşey. Hazne içi kaplaması sonra */
+function buildColumnClad(m, x0, g, cc){
+  const c = cfg, T = TYPES[m.type], P = COL.clad, W = m.width, D = T.D, yb = PABUC, yt = T.H, h = yt - yb, x1 = x0 + W, mat = stoneMat(m.color, m.surf); // kolona özel porselen rengi
+  const uvMap = (mesh, ax) => { const geo = mesh.geometry, p = geo.attributes.position, uv = geo.attributes.uv, n = geo.attributes.normal; mesh.updateMatrix();
+    const v = new THREE.Vector3(), nn = new THREE.Vector3(), nm = new THREE.Matrix3().getNormalMatrix(mesh.matrix);
+    for (let k = 0; k < p.count; k++){ v.fromBufferAttribute(p, k).applyMatrix4(mesh.matrix); nn.fromBufferAttribute(n, k).applyMatrix3(nm);
+      if (Math.abs(nn.y) > .5) uv.setXY(k, (v.x - x0)/SLAB_W, v.z/SLAB_L);                 // üst / alt: plaka boyu derinlikte
+      else if (Math.abs(nn.x) > .5) uv.setXY(k, v.z/SLAB_W, v.y/SLAB_L);                    // yanlar: plaka boyu düşey
+      else uv.setXY(k, (v.x - x0)/SLAB_W, v.y/SLAB_L); }                                    // ön / arka: plaka boyu düşey
+    uv.needsUpdate = true; };
+  const add = (geo, px, py, pz) => { const ms = new THREE.Mesh(geo, mat); ms.position.set(px, py, pz); ms.castShadow = ms.receiveShadow = true; uvMap(ms); addEdges(ms, 20); g.add(ms); return ms; };
+  // dikey plaka (kutu): iç yüzü (inSign yönündeki yüz) gönye için kenarlarda ve üstte P kadar içeri alınır
+  const plate = (w, d, axis, inSign) => { const geo = new THREE.BoxGeometry(w, h, d).toNonIndexed(), p = geo.attributes.position;
+    for (let k = 0; k < p.count; k++){ const x = p.getX(k), y = p.getY(k), z = p.getZ(k);
+      if (axis === 'z' && Math.sign(z) === inSign){ p.setX(k, x - Math.sign(x)*P); if (y > 0) p.setY(k, y - P); }
+      if (axis === 'x' && Math.sign(x) === inSign){ p.setZ(k, z - Math.sign(z)*P); if (y > 0) p.setY(k, y - P); } }
+    geo.computeVertexNormals(); return geo; };
+  add(plate(W, P, 'z', -1), x0 + W/2, yb + h/2, D - P/2);                                   // ön yüz (iç yüzü arkada)
+  add(plate(P, D, 'x', 1), x0 + P/2, yb + h/2, D/2);                                       // sol yan (iç yüzü sağda)
+  add(plate(P, D, 'x', -1), x1 - P/2, yb + h/2, D/2);                                      // sağ yan
+  { // arka yüz: tek parça ters U (açıklık iskeletinkiyle aynı yerde), iç yüz kenarları gönye
+    const ox0 = x0 + cc.p + COL.leg, ox1 = x1 - cc.p - COL.leg, oy = yb + cc.H + (cc.y0 - yb) - COL.lintel, s = new THREE.Shape();
+    [[x0, yb], [ox0, yb], [ox0, oy], [ox1, oy], [ox1, yb], [x1, yb], [x1, yt], [x0, yt]].forEach(([x, y], k) => k ? s.lineTo(x, y) : s.moveTo(x, y));
+    const geo = new THREE.ExtrudeGeometry(s, {depth: P, bevelEnabled: false}).toNonIndexed(), p = geo.attributes.position;
+    for (let k = 0; k < p.count; k++) if (Math.abs(p.getZ(k) - P) < 1e-6){ const x = p.getX(k), y = p.getY(k);
+      if (Math.abs(x - x0) < 1e-6) p.setX(k, x0 + P); else if (Math.abs(x - x1) < 1e-6) p.setX(k, x1 - P); if (Math.abs(y - yt) < 1e-6) p.setY(k, yt - P); }
+    geo.computeVertexNormals(); add(geo, 0, 0, 0);
+  }
+  // hazne ağzı: iskeletin iç yüzünden kaplama payı (yapıştırıcı + porselen) kadar içeride
+  const ix0 = x0 + 2*cc.p + COL.t, ix1 = x1 - 2*cc.p - COL.t, iz0 = 2*cc.p + COL.t, iz1 = D - 2*cc.p - COL.t;
+  { // üst kenar çerçevesi: dış ölçü W × D, iç kenar hazne ağzı (iç kaplamanın üstünü de örter); alt yüzün dış kenarı P içeride (gönye)
+    const s = new THREE.Shape();
+    s.moveTo(x0, 0); s.lineTo(x1, 0); s.lineTo(x1, -D); s.lineTo(x0, -D); s.lineTo(x0, 0);
+    const hl = new THREE.Path(); hl.moveTo(ix0, -iz0); hl.lineTo(ix0, -iz1); hl.lineTo(ix1, -iz1); hl.lineTo(ix1, -iz0); hl.lineTo(ix0, -iz0); s.holes.push(hl);
+    const geo = new THREE.ExtrudeGeometry(s, {depth: P, bevelEnabled: false}).toNonIndexed(), p = geo.attributes.position;
+    for (let k = 0; k < p.count; k++) if (Math.abs(p.getZ(k)) < 1e-6){ const x = p.getX(k), z = -p.getY(k); // alt yüz (dünya y = yt − P)
+      if (Math.abs(x - x0) < 1e-6) p.setX(k, x0 + P); else if (Math.abs(x - x1) < 1e-6) p.setX(k, x1 - P);
+      if (Math.abs(z) < 1e-6) p.setY(k, -P); else if (Math.abs(z - D) < 1e-6) p.setY(k, -(D - P)); }
+    geo.computeVertexNormals(); const ms = new THREE.Mesh(geo, mat); ms.rotation.x = -Math.PI/2; ms.position.y = yt - P; ms.castShadow = ms.receiveShadow = true; uvMap(ms); addEdges(ms, 20); g.add(ms);
+  }
+  // HAZNE İÇİ (kullanıcı): iç duvarlar ve taban porselen, gider tipi entegre eviyedeki gibi (gizli / eğimli / zarf; m.drain) — buildBasin ile aynı çizim;
+  // bitmiş hazne derinliği = COL.basin (iskelet tabanı üstüne 2 + 6 mm, üst çerçeve de 6 mm → ikisi birbirini götürür)
+  // ETEJER (kullanıcı 2026-10-16): haznenin arkasında, üst çerçeveden COL.ledgeDrop (20) aşağıda, COL.ledge (80) derin porselen raf — tezgah üstü batarya buna oturur;
+  // hazne etejerin önünden başlar (arka duvarı = etejer alnı), etejerin üstünde arka ve yanlarda kısa iç kaplama şeritleri
+  // BATARYA (kullanıcı 2026-10-16, m.faucet): 'tezgah' = etejerde tezgah üstü batarya; 'duvar' = duvardan çıkışlı ankastre batarya, ETEJER YOK (hazne arkaya kadar)
+  if (m.faucet === 'duvar'){
+    buildBasin({x0: ix0, x1: ix1, z0: iz0, z1: iz1, s: {drain: m.drain, depth: COL.basin}}, g, x0, {top: yt, t: P, wt: P, mat, matD: stoneMat(m.color, m.surf, true)});
+    wallFaucet((ix0 + ix1)/2, yt + 150, iz0 + 70, g); // entegre eviyedeki gibi: ağız kenarın 150 mm üstünde, haznenin arka kenarından 70 mm öne
+    return;
+  }
+  const LG = COL.ledge, ledY = yt - COL.ledgeDrop, iw = ix1 - ix0;
+  buildBasin({x0: ix0, x1: ix1, z0: iz0 + LG, z1: iz1, s: {drain: m.drain, depth: COL.basin}}, g, x0, {top: yt, t: P, wt: P, mat, matD: stoneMat(m.color, m.surf, true), backTop: ledY - P});
+  const sh = COL.ledgeDrop - P; // etejer üstünden üst çerçevenin altına
+  add(new THREE.BoxGeometry(iw, P, LG), (ix0 + ix1)/2, ledY - P/2, iz0 + LG/2);                 // etejer üstü
+  add(new THREE.BoxGeometry(iw + 2*P, sh, P), (ix0 + ix1)/2, ledY + sh/2, iz0 - P/2);           // arka şerit
+  [ix0 - P/2, ix1 + P/2].forEach(x => add(new THREE.BoxGeometry(P, sh, LG), x, ledY + sh/2, iz0 + LG/2)); // yan şeritler
+  // tezgah üstü batarya etejerin ortasında (çanak bataryası, gövde kısa: ağız hazneye uzanır)
+  const fg = new THREE.Group(); fg.position.y = ledY - TOTAL_H; g.add(fg);
+  vesselFaucet((ix0 + ix1)/2, iz0 + LG/2, fg, COL.faucetVh);
 }
 function buildTall(m, x0, idx, mx){
   const c = cfg, D = TYPES[m.type].D, T = matT(c.body.mat), fT = matT(c.front.mat), cd = D - fT;
@@ -2440,16 +2676,17 @@ function slabUV(m, X0){
   uv.needsUpdate = true; return m;
 }
 const DRAIN_SLOPE = 12; // eğimli gider ve zarfta taban eğimi (mm; kullanıcı 2026-10-09: önce 5, sonra 12)
-function buildBasin(r, tg, X0 = 0){
-  const c = cfg, t = c.top.t, s = r.s, tm = topMat(), w = r.x1 - r.x0, d = r.z1 - r.z0, cx = (r.x0 + r.x1)/2, cz = (r.z0 + r.z1)/2;
-  const yF = TOTAL_H - s.depth, slabB = TOTAL_H - t, sb = (...a) => slabUV(box(...a), X0); // plakadan parça
-  if (s.depth + 12 > t){
-    const yb = yF - 12, hh = slabB - yb;
-    sb(w + 24, hh, 12, tm, cx, yb + hh/2, r.z0 - 6, tg);
-    sb(w + 24, hh, 12, tm, cx, yb + hh/2, r.z1 + 6, tg);
-    sb(12, hh, d, tm, r.x0 - 6, yb + hh/2, cz, tg);
-    sb(12, hh, d, tm, r.x1 + 6, yb + hh/2, cz, tg);
-    sb(w, 12, d, tm, cx, yF - 6, cz, tg);
+/* o: kolon lavabo gibi başka kullanımlar için {top: ağız üst kotu, t: üstteki plaka kalınlığı (duvarlar bunun altına kadar), wt: hazne duvar / taban kalınlığı} */
+function buildBasin(r, tg, X0 = 0, o = {}){
+  const c = cfg, top = o.top ?? TOTAL_H, t = o.t ?? c.top.t, wt = o.wt ?? 12, s = r.s, tm = o.mat || topMat(), w = r.x1 - r.x0, d = r.z1 - r.z0, cx = (r.x0 + r.x1)/2, cz = (r.z0 + r.z1)/2;
+  const yF = top - s.depth, slabB = top - t, sb = (...a) => slabUV(box(...a), X0); // plakadan parça
+  if (s.depth + wt > t){
+    const yb = yF - wt, hh = slabB - yb;
+    { const hb = (o.backTop ?? slabB) - yb; sb(w + 2*wt, hb, wt, tm, cx, yb + hb/2, r.z0 - wt/2, tg); } // arka duvar (kolonda etejerin altına kadar)
+    sb(w + 2*wt, hh, wt, tm, cx, yb + hh/2, r.z1 + wt/2, tg);
+    sb(wt, hh, d, tm, r.x0 - wt/2, yb + hh/2, cz, tg);
+    sb(wt, hh, d, tm, r.x1 + wt/2, yb + hh/2, cz, tg);
+    sb(w, wt, d, tm, cx, yF - wt/2, cz, tg);
     // iç yan yüzler (tezgah altına sarkan kısım)
   } else {
     sb(w, yF - slabB, d, tm, cx, (yF + slabB)/2, cz, tg);
@@ -2479,7 +2716,7 @@ function buildBasin(r, tg, X0 = 0){
     const pos = new Float32Array(tris.length*3), uvs = new Float32Array(tris.length*2);
     tris.forEach((p, i) => { pos.set(p, i*3); uvs[i*2] = p[2]/SLAB_W; uvs[i*2+1] = (p[0] - X0)/SLAB_L; }); // tezgahla aynı plaka koordinatı
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2)); g.computeVertexNormals();
-    const mesh = new THREE.Mesh(g, topMat(true)); mesh.receiveShadow = true; tg.add(mesh);
+    const mesh = new THREE.Mesh(g, o.matD || topMat(true)); mesh.receiveShadow = true; tg.add(mesh);
     // zarf birleşim çizgileri (dört porselen parçanın gönye derzleri): köşelerden yuvanın köşelerine ince koyu çizgi
     const jm = std('zarfJoint', () => new THREE.LineBasicMaterial({color: 0x34332f, transparent: true, opacity: .8}));
     const jl = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([[A, a], [B, b], [C, c3], [Dp, dd]].flat().map(p => new THREE.Vector3(p[0], p[1] + .4, p[2]))), jm); jl.raycast = () => {}; tg.add(jl);
@@ -2762,6 +2999,8 @@ const L_ = document.getElementById('left'), R_ = document.getElementById('right'
 function layoutSVG(type, L){
   const k = 1.2, W = 70, x = 8, y0 = 6, items = [];
   const T = TYPES[type], base = !!T.base;
+  if (T.blk) return `<svg viewBox="0 0 86 ${y0 + 86*k}" aria-hidden="true"><rect x="8" y="44" width="70" height="16" rx="1" fill="var(--raise)" stroke="var(--ink)"/><line x1="12" x2="74" y1="48" y2="48" stroke="var(--muted)"/></svg>`; // blok tezgah: kalın tezgah bloğu
+  if (T.col) return `<svg viewBox="0 0 86 ${y0 + 86*k}" aria-hidden="true"><rect x="25" y="38" width="36" height="64" rx="1" fill="var(--raise)" stroke="var(--ink)"/><path d="M29 38 v7 h28 v-7" fill="none" stroke="var(--muted)"/><ellipse cx="43" cy="42" rx="3" ry="1.2" fill="var(--muted)"/></svg>`; // kolon lavabo: yere basan blok, üstte hazne
   if (T.tall){ // boy dolap: dar uzun gövde, iki kapak (arada gola) ya da tek kapak
     const tw = 26, th = 96, tx = (86 - tw)/2, ty = 4, sy = ty + th*(1 - TALL_SPLIT);
     if (L.id === 'kc' || L.id === 'ke'){ const pw = 46, px = (86 - pw)/2, h2 = 84; // B2: daha geniş gövde, yan yana iki kapak; ortada gola çizgisi ya da kapak kenarlarında elcik
@@ -2825,20 +3064,32 @@ function handleSection(c, title, o, kh, ck, fk, noGola){
       <div class="swname">Kulp rengi · ${HANDLE_COLORS[col].label}</div>` : ''}</section>`;
 }
 function renderLeft(){
-  const c = cfg, lt = ui.libType, tab = ui.leftTab;
+  const c = cfg, lt = ui.libType, cm = ui.selSet.size <= 1 && c.modules.find(x => x.uid === ui.sel && isPor(x)); // kolon lavabo seçili: Malzeme'de porselen seçenekleri, Tezgah sekmesi yok
+  const tab = cm && (ui.leftTab === 'tezgah' || ui.leftTab === 'kapama') ? 'malzeme' : ui.leftTab; // kolonda Tezgah ve Kapama sekmeleri yok
   const matSel = cur => Object.entries(MATS).map(([k, v]) => `<option value="${k}" ${cur === k ? 'selected' : ''}>${v.label}</option>`).join('');
   const sw = (scope, mat, cur) => MATS[mat].colors.map(col => `<button data-act="color" data-scope="${scope}" data-v="${col.id}" aria-pressed="${cur === col.id}" title="${col.name}" style="${swatchStyle(mat, col)}"></button>`).join('');
   let body = '';
   if (tab === 'modul'){
     const types = Object.entries(TYPES).filter(([, v]) => v.cat === lt);
-    const hint = lt === 'b1' ? 'Duvara asılı boy dolap, tezgahın yanında durur. Boy: iki ya da tek kapak · Kiler: VS TAL Gate · Çamaşır: altta sepet, üstte raflı kapak.'
+    const hint = lt === 'p1' ? 'Porselen kaplı, içi marin kontra modüller: yere basan kolon lavabo ve duvara asılı blok tezgah. Boy dolap gibi dizilimin ucunda durur.'
+      : lt === 'b1' ? 'Duvara asılı boy dolap, tezgahın yanında durur. Boy: iki ya da tek kapak · Kiler: VS TAL Gate · Çamaşır: altta sepet, üstte raflı kapak.'
       : lt === 'b2' ? 'Duvara asılı çift kapaklı boy dolap, tezgahın yanında durur. Golalı ya da elcikli.'
       : lt === 'c3' ? 'Bazalı, yere basar; tezgah üstüne oturur.' : 'Askı; tezgahın altına asılır.';
     body = `<div class="libcats"><div class="seg">${Object.entries(CATS).map(([k, v]) => `<button data-act="libtype" data-v="${k}" aria-pressed="${lt === k}" title="${v}">${v.split(' - ')[0]}</button>`).join('')}</div></div>
       <h2 class="sec" style="margin:0">${CATS[lt]}</h2>
-      <p class="hint" style="margin:-8px 0 0">${hint} Karta tıklayın, seçili modülün sağına eklenir.</p>
+      <p class="hint" style="margin:-8px 0 0">${hint}${types.length ? ' Karta tıklayın, seçili modülün sağına eklenir.' : ''}</p>
       <div class="lib">${types.flatMap(([tk, tv]) => LAYOUTS[tk].map(L => `<button class="card" data-act="add" data-type="${tk}" data-layout="${L.id}" title="Dizilime ekle">
         ${layoutSVG(tk, L)}<span class="nm">${tv.tall ? (tv.Hmin === tv.Hmax ? tv.H/10 : (L.hMin || tv.Hmin)/10 + '–' + tv.Hmax/10) + ' cm' : tv.H/10 + ' cm'} · ${L.name}</span><span class="sub">${partsTxt(L)}${L.hidden ? ' · gizli' : ''}</span></button>`)).join('')}</div>`;
+  } else if (tab === 'malzeme' && cm){ // kolon lavabo: tezgahın renk / yüzey seçenekleri, yalnız bu kolona (m.color, m.surf)
+    const ci = c.modules.indexOf(cm);
+    body = `<div class="row sp"><h3 class="ttl">M${ci + 1} · ${isBlk(cm) ? 'Blok tezgah' : 'Kolon lavabo'}</h3><span class="tag">porselen ${COL.clad} mm</span></div>
+      <p class="hint" style="margin:-8px 0 0">${isBlk(cm) ? 'Bütün yüzleri porselen' : 'Dışı, üst çerçevesi, haznesi ve etejeri porselen'}; seçim yalnız bu modülü değiştirir (tezgah ve diğer modüller aynı kalır).</p>
+      <section><h2 class="sec">Renk</h2>
+      <div class="sw">${TOPS.map(t => `<button data-act="mset" data-k="color" data-v="${t.id}" aria-pressed="${cm.color === t.id}" title="${t.name}" style="${topSwatch(t)}"></button>`).join('')}</div>
+      <div class="swname">${topById(cm.color).name}</div></section>
+      <section><h2 class="sec">Yüzey</h2>
+      <div class="seg">${Object.entries(TOP_SURF).map(([k, v]) => `<button data-act="mset" data-k="surf" data-v="${k}" aria-pressed="${cm.surf === k}">${v.label}</button>`).join('')}</div></section>
+      <p class="hint" style="margin:0">Gövde, kapak ve kulp seçenekleri için başka bir modül seçin ya da seçimi kaldırın.</p>`;
   } else if (tab === 'malzeme'){
     body = `<section><h2 class="sec">Gövde</h2>
       <div class="field"><select id="body-mat" data-k="body.mat" aria-label="Gövde malzemesi">${matSel(c.body.mat)}</select></div>
@@ -2877,7 +3128,7 @@ function renderLeft(){
         <p class="hint" style="margin:0 0 10px">${(() => { const full = sideGeom(c, km, k, moduleX(c)).depth + SIDE_BACK; return {L:`L: ön yüz + dolaba dayalı ${SIDE_LEG} mm bacak`, J:`J: ön yüz + dolaba dayalı ${SIDE_LEG} mm bacak + dışta ${full} mm bacak`, U:`U: ön yüz + iki bacak ${full} mm (arka açık)`}[s.shape]; })()} · ${sidePlate(c, s.t, s.shape)} mm plakadan 45° gönye ile${s.t < SIDE_JU_MIN ? ` · J ve U en az ${SIDE_JU_MIN} mm` : ''}</p>`}
         <div class="seg"><button data-act="side-full" data-side="${k}" data-v="0" aria-pressed="${!s.full}"${onBase(km) ? ' disabled title="Bazalı modülde kapama yere kadar"' : ''}>Modül boyu</button><button data-act="side-full" data-side="${k}" data-v="1" aria-pressed="${!!s.full}">Yere kadar</button></div>${onBase(km) ? '<p class="hint" style="margin:6px 0 0">Bazalı modülde kapama yere kadar iner (5 mm pabuç üstünde).</p>' : ''}` : ''}
     </section>`; };
-    body = (km ? `<div class="row sp"><h3 class="ttl">M${ki + 1} · ${TYPES[km.type].label}</h3><span class="tag">${km.width/10} cm</span></div>` + sideBox('left', 'Sol yan kapama') + sideBox('right', 'Sağ yan kapama')
+    body = (km ? `<div class="row sp"><h3 class="ttl">M${ki + 1} · ${TYPES[km.type].label}</h3><span class="tag">${km.width/10} cm</span></div>` + (isPor(km) ? '<p class="hint" style="margin:0">Bu modüle kapama konmaz; dışı zaten porselen kaplı.</p>' : sideBox('left', 'Sol yan kapama') + sideBox('right', 'Sağ yan kapama'))
       : '<p class="hint" style="margin:0">Kapama eklemek için 3B görünümde veya alttaki M etiketlerinden bir modül seçin. Her modülün sol ve sağ kapaması ayrı seçilir.</p>') +
       `<section><h2 class="sec">Kapama malzemesi</h2><div class="seg"><button data-act="side-mat" data-v="front" aria-pressed="${c.sides.mat === 'front'}">Kapakla aynı</button><button data-act="side-mat" data-v="body" aria-pressed="${c.sides.mat === 'body'}">Gövdeyle aynı</button></div></section>
       <p class="hint" style="margin:0">Sayıyı yazıp Enter'a basın veya hazır ölçülerden seçin. İnce plakadan (9 / 8 mm) kalın kapamalar seçilen dönüş şekliyle (L / J / U) 45° gönyeli parçalar olarak parça listesine yazılır. Kapama seçili modüle aittir: tezgah altı modülde tezgah kapamanın üstünü de örter; boy dolapta onun boyunda ve derinliğindedir. Malzeme seçimi tüm kapamalar için ortaktır. Toplam genişlik kapamalarla birlikte hesaplanır.</p>`;
@@ -2894,7 +3145,7 @@ function renderLeft(){
     <p class="hint" style="margin:0">Porselen tezgah tezgahlı modüllerin üstünde tek parça. Kalınlık değişince askı modüller aşağı iner; tezgah üstü 90 cm (çanak lavabo tezgahın üstüne oturur). C3 (bazalı) modül varsa tezgah onun üstüne oturur. Boy dolap tezgahın yanında durur.</p></div>`;
   }
   const pb = L_.querySelector('.pbody'), st = pb && L_.dataset.tab === tab ? pb.scrollTop : 0; // aynı sekmede kaydırma korunur
-  L_.innerHTML = ptabs('ltab', tab, [['modul', 'Modül'], ['malzeme', 'Malzeme'], ['kapama', 'Kapama'], ['tezgah', 'Tezgah']]) + `<div class="pbody">${body}</div>`;
+  L_.innerHTML = ptabs('ltab', tab, [['modul', 'Modül'], ['malzeme', 'Malzeme'], ...(cm ? [] : [['kapama', 'Kapama'], ['tezgah', 'Tezgah']])]) + `<div class="pbody">${body}</div>`;
   L_.dataset.tab = tab; if (st) L_.querySelector('.pbody').scrollTop = st;
 }
 function sinkEditor(s, mx){
@@ -2973,6 +3224,40 @@ function renderRight(){
   if (tab === 'modul'){
     if (ui.selSet.size > 1) body = bulkEditor();
     else if (!m) body = `<p class="hint">3B görünümde bir modüle tıklayın (Ctrl/Shift ile çoklu seçim) veya alttaki M etiketlerinden birine tıklayın. Sağ tık basılı sürükleme döndürür, sol tık basılı sürükleme kaydırır, tekerlek yakınlaştırır. Yeni modül için soldaki Modül sekmesini kullanın.</p>`;
+    else if (isBlk(m)){ // P1 blok tezgah: genişlik ve yükseklik (kalınlık) ayarlı
+      const Tt = TYPES[m.type], {bottomY} = moduleDims(m);
+      body = `<div class="row sp"><h3 class="ttl">M${i+1} · ${Tt.label}</h3><span class="tag">${m.width/10}×${m.height/10}×${String(Tt.D/10).replace('.', ',')}</span></div>
+      <p class="hint" style="margin:-8px 0 0">Duvara asılı blok tezgah · üst yüzü tezgah kotunda (yerden ${Math.round((bottomY + m.height)/10)} cm), altı yerden ${Math.round(bottomY/10)} cm · marin kontra, dışı ${COL.clad} mm porselen</p>
+      <div>
+      <div class="field"><label for="m-type">Modül</label><select id="m-type" data-m="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${m.type === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></div>
+      ${wField('m-width', 'm', m.width, Tt.Wmin, Tt.Wmax, Tt.Wstep)}
+      <div class="field"><label for="m-height">Yükseklik (kalınlık) <output>${m.height} mm</output></label><input type="range" id="m-height" min="${Tt.Hmin}" max="${Tt.Hmax}" step="10" value="${m.height}" data-m="height"></div>
+      <p class="hint" style="margin:-6px 0 10px">Ölçüler bitiş (porselen dahil) · derinlik ${String(Tt.D/10).replace('.', ',')} cm (tezgah gibi) · içte marin kontra ${m.width - 16} × ${Tt.D - 16} × ${m.height - 16} mm · porselen rengi ve yüzeyi <b>Malzeme</b> sekmesinde</p>
+      </div>
+      <div class="row">
+        <button class="btn sm" data-act="move" data-d="-1" ${i === 0 ? 'disabled' : ''}>← Sola</button>
+        <button class="btn sm" data-act="move" data-d="1" ${i === c.modules.length - 1 ? 'disabled' : ''}>Sağa →</button>
+        <button class="btn sm" data-act="dup">Kopyala</button>
+        <button class="btn sm danger" data-act="del-mod">Sil</button>
+      </div>`;
+    }
+    else if (isCol(m)){ // P1 kolon lavabo: yalnız genişlik (bitiş); yükseklik ve derinlik sabit
+      const Tt = TYPES[m.type], cc = colCore(m), f = v => String(v/10).replace('.', ',');
+      body = `<div class="row sp"><h3 class="ttl">M${i+1} · ${Tt.label}</h3><span class="tag">${m.width/10}×${Tt.H/10}×${Tt.D/10}</span></div>
+      <p class="hint" style="margin:-8px 0 0">Yere basan monoblok kolon lavabo · marin kontra iskelet (şimdilik porselensiz çiziliyor)</p>
+      <div>
+      <div class="field"><label for="m-type">Modül</label><select id="m-type" data-m="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${m.type === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></div>
+      ${wField('m-width', 'm', m.width, Tt.Wmin, Tt.Wmax, Tt.Wstep)}
+      <p class="hint" style="margin:-4px 0 10px">Porselen rengi ve yüzeyi <b>Malzeme</b>, gider tipi <b>Lavabo</b> sekmesinde (bu kolona özel).</p>
+      <p class="hint" style="margin:-6px 0 10px">Bitiş ölçüsü (porselen dahil) · yükseklik ${Tt.H/10} cm, derinlik ${Tt.D/10} cm sabit · marin kontra iskelet ${f(cc.W)} × ${f(cc.D)} × ${f(cc.H)} cm (her kaplı yüzde ${COL.clad} mm porselen + ${COL.glue} mm yapıştırıcı payı, altta ${PABUC} mm pabuç düşülerek)</p>
+      </div>
+      <div class="row">
+        <button class="btn sm" data-act="move" data-d="-1" ${i === 0 ? 'disabled' : ''}>← Sola</button>
+        <button class="btn sm" data-act="move" data-d="1" ${i === c.modules.length - 1 ? 'disabled' : ''}>Sağa →</button>
+        <button class="btn sm" data-act="dup">Kopyala</button>
+        <button class="btn sm danger" data-act="del-mod">Sil</button>
+      </div>`;
+    }
     else if (isTall(m)){
       const {H, bottomY} = moduleDims(m), Tt = TYPES[m.type];
       body = `<div class="row sp"><h3 class="ttl">M${i+1} · ${Tt.label}</h3><span class="tag">${m.width/10}×${H/10}×${String(Tt.D/10).replace(".", ",")}</span></div>
@@ -3028,6 +3313,27 @@ function renderRight(){
     const ss = c.sinks.find(s => s.uid === ui.selSink);
     const selM = c.modules.find(x => x.uid === ui.sel), tgt = ss ? ss.module : (selM && !isTall(selM) ? selM.uid : ctrMods(c)[0]?.uid); // lavabonun gideceği modül
     const curType = ss ? ss.type : null, intOK = intAllowed(tgt), canSink = ctrMods(c).length > 0;
+    if (selM && isBlk(selM)){ // P1 BLOK TEZGAH seçiliyken: kolon lavabo gibi ona özel lavabo (porselen entegre hazne), çanak yok
+      const mi = c.modules.indexOf(selM), bm = selM, seg = (k, opts, cur) => `<div class="seg" style="margin-bottom:10px">${opts.map(([v, l]) => `<button data-act="mset" data-k="${k}" data-v="${v}" aria-pressed="${cur === v}">${l}</button>`).join('')}</div>`;
+      const lim = Math.max(0, (bm.width - bm.sw)/2 - 40);
+      body = `<div class="row sp"><h3 class="ttl">M${mi+1} · Blok tezgah</h3><span class="tag">${bm.width/10}×${bm.height/10}×${String(TYPES[bm.type].D/10).replace('.', ',')}</span></div>
+      <p class="hint" style="margin:-8px 0 0">Lavabo bloğa oyulmuş porselen hazne (entegre); ayarlar yalnız bu blok için.</p>
+      <div><div class="lbl" style="margin-bottom:6px">Lavabo</div>${seg('sink', [['yok', 'Yok'], ['entegre', 'Porselen entegre']], bm.sink)}
+      ${bm.sink === 'entegre' ? `<div class="field"><label for="b-sw">Hazne eni <output>${bm.sw} mm</output></label><input type="range" id="b-sw" min="300" max="${bm.width - 80}" step="10" value="${bm.sw}" data-m="sw"></div>
+      <div class="field"><label for="b-so">Konum (ortadan) <output>${bm.so} mm</output></label><input type="range" id="b-so" min="${-lim}" max="${lim}" step="10" value="${bm.so}" data-m="so" ${lim ? '' : 'disabled'}></div>
+      <div class="lbl" style="margin-bottom:6px">Batarya</div>${seg('faucet', [['tezgah', 'Tezgah üstü'], ['duvar', 'Duvardan']], bm.faucet)}
+      <div class="lbl" style="margin-bottom:6px">Gider</div>${seg('drain', Object.entries(DRAINS).map(([k, v]) => [k, v.split(' ')[0]]), bm.drain)}
+      <p class="hint" style="margin:0">Hazne ${bm.sw} × ${INT_D} × ${blkDepth(bm)} mm, ön kenardan ${INT_FRONT/10} cm geride${blkDepth(bm) + COL.clad > bm.height ? ` · blok ${bm.height/10} cm olduğu için hazne altından sarkar` : ''} · porselen rengi <b>Malzeme</b> sekmesinde.</p>` : ''}</div>`;
+    } else
+    if (selM && isCol(selM)){ // P1 KOLON LAVABO seçiliyken: yalnız ona özel lavabo ayarları (hazne kolona oyulmuş porselen; çanak lavabo yok)
+      const mi = c.modules.indexOf(selM), seg = (k, opts, cur) => `<div class="seg" style="margin-bottom:10px">${opts.map(([v, l]) => `<button data-act="mset" data-k="${k}" data-v="${v}" aria-pressed="${cur === v}">${l}</button>`).join('')}</div>`;
+      body = `<div class="row sp"><h3 class="ttl">M${mi+1} · Kolon lavabo</h3><span class="tag">${selM.width/10}×${TYPES[selM.type].H/10}×${TYPES[selM.type].D/10}</span></div>
+      <p class="hint" style="margin:-8px 0 0">Hazne kolona oyulmuş porselen (entegre); çanak lavabo konmaz. Ayarlar yalnız bu kolon için, tezgahı ve diğer lavaboları değiştirmez.</p>
+      <div><div class="lbl" style="margin-bottom:6px">Batarya</div>${seg('faucet', [['tezgah', 'Tezgah üstü (etejerde)'], ['duvar', 'Duvardan']], selM.faucet)}
+      <div class="lbl" style="margin-bottom:6px">Gider</div>${seg('drain', Object.entries(DRAINS).map(([k, v]) => [k, v.split(' ')[0]]), selM.drain)}
+      <p class="hint" style="margin:0 0 10px">Porselen rengi ve yüzeyi: sol panelde <b>Malzeme</b> · ${topById(selM.color).name}, ${TOP_SURF[selM.surf].label.toLowerCase()}</p>
+      <p class="hint" style="margin:0">Bitmiş hazne ${selM.width - 2*(2*(COL.clad + COL.glue) + COL.t)} × ${TYPES[selM.type].D - 2*(2*(COL.clad + COL.glue) + COL.t) - (selM.faucet === 'duvar' ? 0 : COL.ledge)} × ${COL.basin} mm · ${selM.faucet === 'duvar' ? 'duvardan çıkışlı batarya, etejer yok' : `arkada ${COL.ledge/10} cm batarya etejeri (üst kenardan ${COL.ledgeDrop/10} cm aşağıda), tezgah üstü batarya`} · tezgahlı modüllere lavabo eklemek için o modülü seçin.</p></div>`;
+    } else
     body = `<div><div class="lbl" style="margin-bottom:6px">Lavabo tipi${ss ? ' · seçili lavabo' : ''}</div>
       <div class="seg">${Object.entries(SINKS).map(([k, v]) => `<button data-act="sink-type" data-v="${k}" aria-pressed="${curType === k}" ${canSink && (k !== 'integrated' || intOK) ? '' : 'disabled'}${k === 'integrated' && !intOK ? ` title="Porselen eviye için modül en az ${INT_MIN_W/10} cm olmalı"` : ''}>${v.label}</button>`).join('')}</div>
       ${!canSink ? '<p class="hint" style="margin:6px 0 0">Lavabo yalnız tezgahlı modüllere konur; önce tezgah altı modül ekleyin.</p>' : intOK ? '' : `<p class="hint" style="margin:6px 0 0">Modül ${INT_MIN_W/10} cm'den dar: yalnız çanak lavabo konabilir.</p>`}
@@ -3089,7 +3395,10 @@ function refresh(opts = {}){
   normalize();
   if (opts.scene !== false) buildScene();
   // Malzeme (tutamak) ve Kapama sekmeleri seçili modüle bağlı: seçim değişince sol panel de yenilenir
-  if (opts.left !== false || ['malzeme', 'kapama'].includes(ui.leftTab)) renderLeft();
+  // kolon lavabo seçimi değişince sol paneldeki sekmeler de değişir (kolonda Kapama / Tezgah yok): Modül sekmesi açıkken de yenilenir
+  const colSel = ui.selSet.size <= 1 && cfg.modules.some(x => x.uid === ui.sel && isPor(x));
+  if (opts.left !== false || ['malzeme', 'kapama', 'tezgah'].includes(ui.leftTab) || colSel !== !!ui.leftColSel) renderLeft();
+  ui.leftColSel = colSel;
   renderRight(); renderStrip(); saveDraft();
 }
 
@@ -3285,7 +3594,7 @@ function onField(e, live){
     });
     refresh({left:false}); return true;
   }
-  if ((t.dataset.m === 'bottom' || t.dataset.m === 'height' || t.dataset.m === 'elcikY') && m){ // boy dolap alt kenarı / yüksekliği / elcik yüksekliği: sürgü canlı
+  if ((t.dataset.m === 'bottom' || t.dataset.m === 'height' || t.dataset.m === 'elcikY' || t.dataset.m === 'sw' || t.dataset.m === 'so') && m){ // sw / so: blok tezgah lavabosunun eni / kayması // boy dolap alt kenarı / yüksekliği / elcik yüksekliği: sürgü canlı
     const ho = t.dataset.m === 'height' && TYPES[m.type].Hopts, v = ho ? ho.reduce((a, b) => Math.abs(b - t.value) < Math.abs(a - t.value) ? b : a) : +t.value; // B1 Çamaşır: izinli yüksekliklere çeker
     m[t.dataset.m] = v;
     if (live){ const o = t.closest('.field').querySelector('output'); if (o) o.textContent = v + ' mm'; scheduleBuild(); }
