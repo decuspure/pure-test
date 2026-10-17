@@ -1012,7 +1012,8 @@ function normalize(c = cfg){
   if (c === cfg){ const mxN = moduleX(c); const off = c.modules.filter(m => m.hidden && !isTall(m) && !hiddenFits(m, c, mxN)); off.forEach(m => m.hidden = false); if (off.length) toast('Gizli Çekmece bu modüle sığmadığı için kaldırıldı'); }
   if (narrow) toast(hasTop(c) ? `Modül ${INT_MIN_W/10} cm'den dar: porselen eviye yerine çanak lavabo kondu` : 'Tezgah olmadığı için porselen eviye yerine çanak lavabo kondu');
   // ayna boy dolabın önüne/üstüne gelmez: boy dolapla çakışırsa tezgahlı bölümün içine alınır
-  const mxM = moduleX(c), tallR = c.modules.filter(isTall).map(m => { const r = mxM.map[m.uid]; return [r.x0 - r.lt, r.x1 + r.rt]; });
+  // P1 (kolon lavabo, blok tezgah) üstüne ayna gelebilir: yalnız boy dolaplar aynayı iter
+  const mxM = moduleX(c), tallR = c.modules.filter(m => isTall(m) && !isPor(m)).map(m => { const r = mxM.map[m.uid]; return [r.x0 - r.lt, r.x1 + r.rt]; });
   c.mirrors.forEach(mi => {
     mi.w = clamp(Math.round(+mi.w) || 600, 300, 2400); mi.h = clamp(Math.round(+mi.h) || 800, 300, 2000);
     mi.x = clamp(Math.round(+mi.x) || 0, -3000, 3000); mi.bottom = clamp(Math.round(+mi.bottom) || 1120, 600, 2000);
@@ -3421,7 +3422,9 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || b.disabled) return; // pasif düğme (içindeki simgeye tıklansa da) işlem yapmaz
   const a = b.dataset.act, sel = cfg.modules.find(m => m.uid === ui.sel), si = cfg.modules.indexOf(sel);
   // ayna boy dolaba konmaz: boy dolap seçiliyse (veya seçim yoksa) tezgahlı bölümün ortası
-  const selCenter = () => { const mx = moduleX(); if (sel && !isTall(sel)) return Math.round((mx.map[sel.uid].x0 + sel.width/2)/10)*10; return ctrMods(cfg).length ? Math.round((mx.run0 + mx.run1)/20)*10 : 0; };
+  // ayna: seçili tezgahlı modülün ya da P1'in (kolon lavabo / blok tezgah — üstüne ayna gelir) ortasına; yoksa tezgahlı bölümün, o da yoksa ilk P1'in ortasına
+  const selCenter = () => { const mx = moduleX(), mid = m => Math.round((mx.map[m.uid].x0 + m.width/2)/10)*10, p1 = cfg.modules.find(isPor);
+    if (sel && (!isTall(sel) || isPor(sel))) return mid(sel); return ctrMods(cfg).length ? Math.round((mx.run0 + mx.run1)/20)*10 : p1 ? mid(p1) : 0; };
   switch (a){
     case 'ltab': ui.leftTab = b.dataset.v; renderLeft(); buildScene(); break;
     case 'rtab': ui.rightTab = b.dataset.v; buildScene(); renderRight(); break;
@@ -3604,7 +3607,7 @@ function onField(e, live){
   if (t.dataset.m && m){
     const f = t.dataset.m;
     m[f] = f === 'hidden' ? t.checked : t.value; // genişlik yukarıda ayrı işlenir
-    if (f === 'type') m.layout = LAYOUTS[m.type][0].id;
+    if (f === 'type'){ m.layout = LAYOUTS[m.type][0].id; m.height = TYPES[m.type].H; } // tip değişince yükseklik yeni tipin varsayılanına (ör. kolon 90 cm → blok 12 cm, 30 cm'ye kırpılmasın)
     refresh({left:false}); return true;
   }
   if (t.dataset.org && m){ m.org[t.dataset.org] = t.value; refresh({left:false}); return true; }
