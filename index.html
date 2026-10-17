@@ -548,6 +548,7 @@ function migrateTypes(c){
   }
   return c;
 }
+const FRONT_MATS = ['kaplama', 'lake']; // kapak malzemesi seçenekleri (MDF lam kapakta yok; kullanıcı 2026-10-17) — gövdede üçü de var
 const MATS = {
   /* KAPLAMA RENKLERİ (kullanıcı 2026-10-17): yalnız bu 5 — dokular kullanıcının görsellerinden (tex: 1024 × 512 JPEG, damar yatay, ≈ 1000 × 500 mm;
      fotoğraflı ikisinde panel kırpıldı, ışık düzeltildi, çizikler damar boyunca dolduruldu); hex ortalama renk. texMM: dokunun gerçek ölçüsü [damar boyunca, damara dik] mm — damar / halka aralıklarından tahmin (dijital görseller ~50 × 25 cm, fotoğraflar ~30 × 20 cm numune panelinden ~28,5 × 14 cm kırpım). Eski türler migrateTypes'ta en yakına (KAP_OLD) */
@@ -937,6 +938,8 @@ function normalize(c = cfg){
 
   migrateTypes(c);
   // renk geçerliliği eski lam renkleri çevrildikten SONRA (migrateTypes) denetlenir
+  if (!FRONT_MATS.includes(c.front.mat)){ // kapakta MDF lam yok (kullanıcı 2026-10-17): yalnız kaplama ve lake — eski lam kapak en yakın lake rengine
+    c.front.color = {dcsgb: 'dcs02', dcsgcb: 'dcstn184', dcsgt: 'dcsn27', dcsgs: 'dcsn16'}[c.front.color] || 'dcs02'; c.front.mat = 'lake'; }
   [c.body, c.front].forEach(o => { if (!MATS[o.mat].colors.some(x => x.id === o.color)) o.color = MATS[o.mat].colors[0].id; });
   c.modules.forEach(m => {
     if (m.under){ // blok tezgah alt modülü: blok yoksa normal modüle döner; yalnız askı C1 / C2
@@ -3131,7 +3134,7 @@ function handleSection(c, title, o, kh, ck, fk, noGola){
 function renderLeft(){
   const c = cfg, lt = ui.libType, cm = ui.selSet.size <= 1 && c.modules.find(x => x.uid === ui.sel && isPor(x)); // kolon lavabo seçili: Malzeme'de porselen seçenekleri, Tezgah sekmesi yok
   const tab = cm && (ui.leftTab === 'tezgah' || ui.leftTab === 'kapama') ? 'malzeme' : ui.leftTab; // kolonda Tezgah ve Kapama sekmeleri yok
-  const matSel = cur => Object.entries(MATS).map(([k, v]) => `<option value="${k}" ${cur === k ? 'selected' : ''}>${v.label}</option>`).join('');
+  const matSel = (cur, only) => Object.entries(MATS).filter(([k]) => !only || only.includes(k)).map(([k, v]) => `<option value="${k}" ${cur === k ? 'selected' : ''}>${v.label}</option>`).join('');
   const sw = (scope, mat, cur) => MATS[mat].colors.map(col => `<button data-act="color" data-scope="${scope}" data-v="${col.id}" aria-pressed="${cur === col.id}" title="${col.name}" style="${swatchStyle(mat, col)}"></button>`).join('');
   let body = '';
   if (tab === 'modul'){
@@ -3162,7 +3165,7 @@ function renderLeft(){
       <div class="field"><select id="body-mat" data-k="body.mat" aria-label="Gövde malzemesi">${matSel(c.body.mat)}</select></div>
       <div class="sw">${sw('body', c.body.mat, c.body.color)}</div><div class="swname">${colorName(c.body.mat, c.body.color)} · ${matT(c.body.mat)} mm</div></section>
     <section><h2 class="sec">Kapak</h2>
-      <div class="field"><select id="front-mat" data-k="front.mat" aria-label="Kapak malzemesi">${matSel(c.front.mat)}</select></div>
+      <div class="field"><select id="front-mat" data-k="front.mat" aria-label="Kapak malzemesi">${matSel(c.front.mat, FRONT_MATS)}</select></div>
       <div class="sw">${sw('front', c.front.mat, c.front.color)}</div><div class="swname">${colorName(c.front.mat, c.front.color)} · ${matT(c.front.mat)} mm</div>
       ${c.front.mat === 'lake' ? `<div class="seg" style="margin-top:8px">${Object.entries(LAKE_FIN).map(([k, v]) => `<button data-act="set" data-k="front.fin" data-v="${k}" aria-pressed="${c.front.fin === k}">${v.label}</button>`).join('')}</div>` : ''}
       <div class="lbl" style="margin:12px 0 6px">Kapak tipi</div>
