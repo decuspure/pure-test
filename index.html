@@ -614,19 +614,19 @@ const frontStyleText = f => (FRONT_STYLES[f.style] || FRONT_STYLES.duz) + (f.sty
    şerit: Ø12 yarım yuvarlak çubuklar, aralıksız (adım 12), kapağın tamamını kaplar;
    kapak ölçüsü 12'ye bölünmezse fark iki uçtaki çubuğa yarı yarıya verilir (uç çubuk 9–15 mm eninde, 6 mm çıkıntı) */
 const STRIP_D = 12;
-function trimLayout(f, w, h, handle){
+function trimLayout(f, w, h){
   if (f.style === 'serit'){
     // çubuklar kapakla hemyüz, kenarlarda boşluk kalmaz; ortadakiler Ø12, uçtakiler kapak boyuna göre ayarlı
     const vert = f.stripDir !== 'yatay', span = vert ? w : h, n = Math.max(1, Math.round(span/STRIP_D));
     const ew = n === 1 ? span : n === 2 ? span/2 : STRIP_D + (span - n*STRIP_D)/2;
     const ws = Array.from({length:n}, (_, i) => (i === 0 || i === n - 1) ? ew : STRIP_D);
     let a = 0; const ps = ws.map(v => { const p = a + v/2; a += v; return p; });
-    return {kind:'serit', vert, n, sw:STRIP_D, ew, ws, ps, dep:STRIP_D/2, len: vert ? h : w, cut:0};
+    return {kind:'serit', vert, n, sw:STRIP_D, ew, ws, ps, dep:STRIP_D/2, len: vert ? h : w};
   }
   if (f.style === 'oval' || f.style === 'kose'){
-    const round = f.style === 'oval', m = 0, bw = 10, dep = 8; // iki tipte aynı oran
+    const round = f.style === 'oval', bw = 10, dep = 8; // iki tipte aynı oran
     if (h < 2*bw + 20 || w < 2*bw + 20) return null;
-    return {kind:'frame', round, m, bw, dep};
+    return {kind:'frame', round, bw, dep};
   }
   return null;
 }
@@ -938,7 +938,7 @@ function sinkOffLim(s, c = cfg){
   const room = s.type === 'integrated' ? m.width - 2*matT(c.body.mat) : m.width;
   return Math.max(0, (room - s.w)/2);
 }
-function sinkOver(m, c = cfg){ // (3. parametre eski çağrılardan kalma, kullanılmaz)
+function sinkOver(m, c = cfg){
   if (isTall(m) || isUpper(m)) return null;
   return c.sinks.find(s => s.module === m.uid) || null; // lavabo kayıtlı modülüne aittir (konumdan bağımsız)
 }
@@ -1038,7 +1038,7 @@ function normalize(c = cfg){
     const lim = sinkOffLim(s, c); s.offset = clamp(Math.round(+s.offset || 0), -lim, lim);
   });
   // lavabolu modüle Gizli Çekmece konmaz
-  { const mxN = moduleX(c); const off = c.modules.filter(m => m.hidden && sinkOver(m, c, mxN)); off.forEach(m => m.hidden = false); if (off.length && c === cfg) toast('Lavabolu modüle Gizli Çekmece konmaz; kaldırıldı'); }
+  { const mxN = moduleX(c); const off = c.modules.filter(m => m.hidden && sinkOver(m, c)); off.forEach(m => m.hidden = false); if (off.length && c === cfg) toast('Lavabolu modüle Gizli Çekmece konmaz; kaldırıldı'); }
   // sığmayan Gizli Çekmece seçili kalmaz (ör. kulp tipi golaya çevrilince C1-30 / C2-60'ta yer kalmaz)
   { const mxN = moduleX(c); const off = c.modules.filter(m => m.hidden && !isTall(m) && !hiddenFits(m, c, mxN)); off.forEach(m => m.hidden = false); if (off.length && c === cfg) toast('Gizli Çekmece bu modüle sığmadığı için kaldırıldı'); }
   if (narrow && c === cfg) toast(`Porselen eviye için modülde tezgah ve en az ${INT_MIN_W/10} cm genişlik gerekir; çanak lavabo kondu`);
@@ -1099,7 +1099,7 @@ function warnings(c = cfg){
     (c.sinks || []).filter(s => s.type !== 'integrated').forEach(s => { const rim = th + vesselH(s); if (rim !== VESSEL_RIM) out.push(`${vModel(s).label}: çanak üst kenarı ${cm(rim)} cm (90 cm değil${c.modules.some(onBase) ? '; bazalı modül var, tezgah modüle oturuyor' : '; tezgah en yüksek çanağa göre'}).`); });
   }
   c.modules.forEach((m,i) => {
-    const s = sinkOver(m, c, mx);
+    const s = sinkOver(m, c);
     const hs = drawerHeights(m, c);
     if (s){
       const prot = s.type === 'integrated' ? Math.max(0, s.depth + 12 - c.top.t) : 0;
@@ -1146,8 +1146,8 @@ function cutList(c = cfg){
   const push = (part, mod, qty, L, W, t, mat, key, note='') => rows.push({part, mod, qty, L:half(L), W:half(W), t, mat, key, note,
     col: String(key).startsWith(bm.key) && mat.includes(bCN) ? c.body.color : c.front.color});
   // kapak çıtaları (çekmece kapağı ve boy dolap kapağı için ortak): dw × dh kapak ölçüsü
-  const trimRows = (label, mod, dw, dh, handle) => {
-    const tl = trimLayout(c.front, dw, dh, handle); if (!tl) return;
+  const trimRows = (label, mod, dw, dh) => {
+    const tl = trimLayout(c.front, dw, dh); if (!tl) return;
     const tm = fName.replace(/\d+ mm/, Math.round(tl.dep) + ' mm');
     if (tl.kind === 'frame'){
       const nm = `${label} · ${tl.round ? 'oval' : 'köşe'} profil`;
@@ -1195,14 +1195,14 @@ function cutList(c = cfg){
           push(lab, mod, 1, dH, DW, fT, fName, fKey, `menteşe ${k} · TEK PARÇA çerçeve: ortası CNC ile boşaltılır, ${F} mm çerçeve kalır (açıklık ${DW - 2*F} × ${dH - 2*F} mm) · iç kenarda arkadan 8 × 8 mm cam lambası · iç kenarlar da bantlı` + (c.front.style !== 'duz' ? ' · ' + frontStyleText(c.front) : '') + (fGrain('dikey') ? ' · ' + fGrain('dikey') : ''));
           rows[rows.length - 1].band = [4, 4]; // dış + iç kenarlar
           hw.push({item:`CNC iç boşaltma + cam lambası (${lab})`, mod, qty:1, price:0});
-          const tl = trimLayout(c.front, DW, dH, th); // kapak tipi camlıda da: çerçeve çıtası aynen; şerit çubuklar camın üstünden geçmez (çerçevede kısa parça)
+          const tl = trimLayout(c.front, DW, dH); // kapak tipi camlıda da: çerçeve çıtası aynen; şerit çubuklar camın üstünden geçmez (çerçevede kısa parça)
           if (tl && tl.kind === 'serit'){
             const span = tl.vert ? DW : dH, inH = tl.ps.filter(p => p > F && p < span - F).length, nm = `${lab} çıtası · şerit ${tl.vert ? 'dikey' : 'yatay'}`, gn = fm.key === 'kaplama' ? ' · su yönü çubuk boyunca' : '';
             const tm = fName.replace(/\d+ mm/, Math.round(tl.dep) + ' mm'), ends = Math.min(2, tl.n), mid = tl.n - ends - inH;
             if (mid) push(nm, mod, mid, tl.len, tl.sw, Math.round(tl.dep), tm, fKey, `Ø${tl.sw} yarım yuvarlak · aralıksız · kapakla hemyüz · çerçeve üstünde tam boy` + gn);
             push(nm + ' · uç', mod, ends, tl.len, tl.ew, Math.round(tl.dep), tm, fKey, `uç çubuk ${String(+tl.ew.toFixed(1)).replace('.', ',')} mm en · ${Math.round(tl.dep)} mm çıkıntı`);
             if (inH) push(nm + ' · kısa (cam ' + (tl.vert ? 'üstü / altı' : 'yanları') + ')', mod, 2*inH, F - 10, tl.sw, Math.round(tl.dep), tm, fKey, `Ø${tl.sw} yarım yuvarlak · ${F} mm çerçeve üstünde, cam çevresi çıtasında biter` + gn);
-          } else trimRows(`${lab} çıtası`, mod, DW, dH, th);
+          } else trimRows(`${lab} çıtası`, mod, DW, dH);
           if (tl){ // cam açıklığının çevresinde çıta (kullanıcı 2026-10-20): çerçeve tipinde aynı profil, şeritte oval; 10 × 8 mm, 45° gönye, açıklığın kenarında
             const iw = DW - 2*F + 20, ih = dH - 2*F + 20, rnd = tl.kind === 'serit' || tl.round, nm2 = `${lab} · cam çevresi çıtası · ${rnd ? "oval" : "köşe"} profil`, tm2 = fName.replace(/\d+ mm/, '8 mm'), gn2 = fm.key === 'kaplama' ? ' · su yönü çıta boyunca' : '';
             push(nm2, mod, 2, iw, 10, 8, tm2, fKey, 'cam açıklığının kenarında · 45° gönye · yatay' + gn2);
@@ -1212,7 +1212,7 @@ function cutList(c = cfg){
       }
       else if (pair){ push('Kapak (sol)', mod, 1, dH, DW, fT, fName, fKey, 'menteşe sol' + st); push('Kapak (sağ)', mod, 1, dH, DW, fT, fName, fKey, 'menteşe sağ' + st); }
       else push('Kapak (tek)', mod, 1, dH, DW, fT, fName, fKey, `menteşe ${side}` + st);
-      if (!m.mirrorDoor && !upperGlass(m)) (pair ? ['sol', 'sağ'] : ['tek']).forEach(k => trimRows(`Kapak (${k}) çıtası`, mod, DW, dH, th));
+      if (!m.mirrorDoor && !upperGlass(m)) (pair ? ['sol', 'sağ'] : ['tek']).forEach(k => trimRows(`Kapak (${k}) çıtası`, mod, DW, dH));
       if (m.mirrorDoor) hw.push({item:`Ayna 4 mm (aynalı kapak, kapağa yapıştırılır) · ${Math.round(DW - 1)} × ${Math.round(dH - 1)} mm`, mod, qty: pair ? 2 : 1, price: Math.round((DW - 1)*(dH - 1)/1e6*PRICE.mirrorM2*100)/100});
       (pair ? ['sol', 'sağ'] : [side]).forEach(k => hw.push({item:`${hingeName(m)} · ${k}`, mod, qty:hingeN(dH), price:hingePrice(m)}));
       hw.push({item:'Gizli askı mekanizması (üst dolap)', mod, qty:2, price:0});
@@ -1256,7 +1256,7 @@ function cutList(c = cfg){
       const st = (c.front.style !== 'duz' ? ' · ' + frontStyleText(c.front) : '') + (fGrain('dikey') ? ' · ' + fGrain('dikey') : '');
       push('Kapak (sol)', mod, 1, dH, DW, fT, fName, fKey, 'menteşe sol' + st);
       push('Kapak (sağ)', mod, 1, dH, DW, fT, fName, fKey, 'menteşe sağ' + st);
-      trimRows('Kapak (sol) çıtası', mod, DW, dH, th); trimRows('Kapak (sağ) çıtası', mod, DW, dH, th);
+      trimRows('Kapak (sol) çıtası', mod, DW, dH); trimRows('Kapak (sağ) çıtası', mod, DW, dH);
       hw.push({item:`${hingeName(m)} · sol`, mod, qty:hingeN(dH), price:hingePrice(m)});
       hw.push({item:`${hingeName(m)} · sağ`, mod, qty:hingeN(dH), price:hingePrice(m)});
       hw.push({item:'Gizli askı mekanizması', mod, qty:4, price:0});
@@ -1276,12 +1276,12 @@ function cutList(c = cfg){
       push('Arkalık', mod, 1, W - 2*T + 10, H - T, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, ön yüzü arka kenardan ${TALL_BACK_IN} mm içeride · alt tablanın üstünden en üste kadar, yukarıdan sürülür`);
       const fNote = `menteşe ${side}` + (c.front.style !== 'duz' ? ' · ' + frontStyleText(c.front) : '') + (fGrain('dikey') ? ' · ' + fGrain('dikey') : '');
       const DW = doorFit(m).dw; // kapama tarafından 3, diğer taraftan 1,5 mm pay
-      if (one){ push('Kapak (tek)', mod, 1, dOne, DW, fT, fName, fKey, fNote); trimRows('Kapak (tek) çıtası', mod, DW, dOne, th); }
+      if (one){ push('Kapak (tek)', mod, 1, dOne, DW, fT, fName, fKey, fNote); trimRows('Kapak (tek) çıtası', mod, DW, dOne); }
       else {
         if (tallWash(m)) push('Çekmece kapağı (çamaşır sepeti)', mod, 1, dLo, DW, fT, fName, fKey, ['menteşesiz, Envi Space XX Pro ön bağlantısına', fNote.replace(/^menteşe [^·]*·? ?/, '')].filter(Boolean).join(' · '));
         else push('Kapak (alt)', mod, 1, dLo, DW, fT, fName, fKey, fNote);
         push('Kapak (üst)', mod, 1, dUp, DW, fT, fName, fKey, fNote);
-        trimRows('Kapak (alt) çıtası', mod, DW, dLo, th); trimRows('Kapak (üst) çıtası', mod, DW, dUp, th);
+        trimRows('Kapak (alt) çıtası', mod, DW, dLo); trimRows('Kapak (üst) çıtası', mod, DW, dUp);
       }
       hw.push({item:`${hingeName(m)} · ${side}`, mod, qty: one ? hingeN(dOne) : (tallWash(m) ? 0 : hingeN(dLo)) + hingeN(dUp), price:hingePrice(m)}); // çamaşırda alt kapak menteşesiz
       hw.push({item:'Gizli askı mekanizması', mod, qty:2, price:0});
@@ -1298,7 +1298,7 @@ function cutList(c = cfg){
       if (th === 'push') hw.push({item:'Blum TIP-ON (kapak, push-open)', mod, qty: one ? 1 : 2, price:PRICE.tipOn});
       return;
     }
-    const s = sinkOver(m, c, mx), fit = drawerFit(m, c, mx); // 3B ile ortak kutu hesabı
+    const s = sinkOver(m, c), fit = drawerFit(m, c, mx); // 3B ile ortak kutu hesabı
     const bz = onBase(m); // BİRLEŞİM (kullanıcı çizimi 2026-10-10): askıda yanlar tam boy, tablalar arada; bazalıda ALT TABLA TAM EN, yanlar onun üstünde
     push('Yan dikme', mod, 2, bz ? H - T : H, cd, T, bName, bKey, bz ? 'Bazalı: alt tablanın üstüne oturur' : 'Askı: tam boy, tablalar arada');
     push('Alt tabla', mod, 1, bz ? W : W - 2*T, cd, T, bName, bKey, bz ? 'Bazalı: tam en, yan dikmeler üstünde' : 'Yan dikmelerin arasında');
@@ -1319,7 +1319,7 @@ function cutList(c = cfg){
     hs.forEach((h,k) => {
       const u = s && k === 0, uw = uCutW(W, T);
       push(`Çekmece kapağı ${k+1}`, mod, 1, doorFit(m).dw, doorH(h, k, c.handle === 'kanal'), fT, fName, fKey, [c.front.style !== 'duz' ? frontStyleText(c.front) : '', u ? 'Kapak düz · kutu U kesim' : '', fGrain('yatay')].filter(Boolean).join(' · '));
-      trimRows(`Çekmece kapağı çıtası ${k+1}`, mod, doorFit(m).dw, doorH(h, k, c.handle === 'kanal'), c.handle);
+      trimRows(`Çekmece kapağı çıtası ${k+1}`, mod, doorFit(m).dw, doorH(h, k, c.handle === 'kanal'));
       // LEGRABOX: taban 16 mm (LW − 35) × (NL − 10); ahşap arkalık (LW − 38) gövde malzemesinde; boy 3B ile aynı (drawerFit)
       const lg = fit[k].lgb, LW = W - 2*T;
       // çekmece tabanı ve arkalığı gövde plakasından (18 / 19 mm)
@@ -1938,7 +1938,7 @@ function buildModule(m, x0, idx, mx){
       [[25, 8, 4], [11, bottomY - 23, 8 + (bottomY - 23)/2], [22, 15, bottomY - 7.5]].forEach(([r, h, y]) => { const p = cyl(r, h, lm, g); p.position.set(lx, y, lz); p.receiveShadow = true; });
     }));
   }
-  const hs = drawerHeights(m), s = sinkOver(m, c, mx);
+  const hs = drawerHeights(m), s = sinkOver(m, c);
   if (!modTop(m)){ // bu modülde tezgah yok: üst tabla (dolabın üstü kapalı; çanak üstüne oturur), arkalığın önünde biter
     carve(W - 2*T, T, cd - TALL_BACK_IN, bm, cx, bottomY + H - T/2, TALL_BACK_IN + (cd - TALL_BACK_IN)/2, g, golaCut);
     if (panelOn(m)){ const r = mx.map[m.uid], pt = panelT(m, c); box(W + r.lt + r.rt, pt, cd + fT, fm, cx + (r.rt - r.lt)/2, bottomY + H + pt/2, (cd + fT)/2, g); } // üst panel (kapak malzemesi) kapamaların da üstünü örter
@@ -2037,7 +2037,7 @@ const elcikShade = fm => { let s = ELCIK_SHADE.get(fm); if (!s){ s = fm.clone();
    b: dolabın İÇ ölçüsü {xL, xR, y0 (alt tabla üstü), y1 (üst tabla altı), z0 (arkalık önü), z1 (gövde ön kenarı)}
    opt: {n tepsi, key, door: () => kapak grubu (dönme ekseni kapağın ön/dış kenarında), hx: menteşe ekseni x, s: kapak menteşeden +x (1) / −x (−1),
          dw: kapak eni, fT: kapak kalınlığı}. Üretici koşulları: dolap eni 450, derinlik ≥ 480, yük 80 kg (bayi bilgisi). */
-const TALGATE = {W: 450, Hmin: 1450, Hmax: 1700, Dmin: 480, load: 80, trays: 4, trayWall: 70, trayLip: 40, post: 20, rail: 16, gap: 12, armA: 90, rod: 8}; // armA: kapaktaki mafsalın menteşe kenarından uzaklığı (mm)
+const TALGATE = {trays: 4, trayWall: 70, trayLip: 40, post: 20, rail: 16, gap: 12, armA: 90, rod: 8}; // üretici koşulları (bayi): dolap eni 450, derinlik ≥ 480, yük 80 kg; armA: kapaktaki mafsalın menteşe kenarından uzaklığı (mm)
 function buildTalGate(parent, b, opt = {}){
   const mat = M.vs || (M.vs = new THREE.MeshStandardMaterial({color: srgb('#2a2b2d'), metalness: .35, roughness: .55, envMapIntensity: .3})); // antrasit (Carbon Steel Gray)
   const n = opt.n || TALGATE.trays, P = TALGATE.post, R = TALGATE.rail, G = TALGATE.gap;
@@ -2497,7 +2497,7 @@ function buildUpper(m, x0){
 }
 /* Blum LEGRABOX: 12,8 mm düz metal yanlar (üstte bordür), ahşap arkalık ve 16 mm taban (gövde malzemesinde),
    iç ön panel yok (kapak ön bağlantı parçasıyla doğrudan kutuya bağlanır). Yan yükseklikleri standart kademeler. */
-const LGB = {side:12.8, bottom:16, back:16, run:16, backH:{M:63, C:148}, // ahşap arkalık yüksekliği (16 mm, tabanın üstünde) — Blum
+const LGB = {side:12.8, bottom:16, back:16, run:16, // ahşap arkalık yanla hemyüz (drawerBox bh = yan − taban), Blum'un M 63 / C 148 ölçüsü kullanılmaz
    color:'Carbon black', H:[['N', 68.5], ['M', 90.5], ['K', 128.5], ['C', 177], ['F', 241]]};
 const lgbFor = h => LGB.H.filter(v => v[1] <= h).pop() || LGB.H[0]; // boşluğa sığan en yüksek kademe (iç çekmece)
 /* kullanılan boylar yalnız M ve C: tezgah altı (üst) çekmece hep M; alttakiler C'ye yer varsa C, yoksa M */
@@ -2522,7 +2522,7 @@ function lgbProfile(len, h, S, px, yb, pc, parent){
 /* Gizli Çekmece bu modüle sığar mı (seçili olmasa da, seçilmiş gibi hesaplanır); başka kulp tipiyle denemek için farklı c verilebilir */
 const hiddenFits = (m, c = cfg, mx = moduleX(c)) => !!(drawerFit(Object.assign({}, m, {hidden: true}), c, mx)[0] || {}).inner;
 function drawerFit(m, c = cfg, mx = moduleX(c)){
-  const {H, bottomY} = moduleDims(m, c), T = matT(c.body.mat), hs = drawerHeights(m, c), s = sinkOver(m, c, mx), gola = c.handle === 'kanal';
+  const {H, bottomY} = moduleDims(m, c), T = matT(c.body.mat), hs = drawerHeights(m, c), s = sinkOver(m, c), gola = c.handle === 'kanal';
   const xr = mx.map[m.uid], surf = topH(c);
   const capTop = intRanges(c, mx).filter(r => r.s.depth + 12 > c.top.t).reduce((lim, r) =>
     (r.x1 + 12 > xr.x0 && r.x0 - 12 < xr.x1) ? Math.min(lim, surf - r.s.depth - 12 - 8) : lim, Infinity);
@@ -2602,11 +2602,10 @@ function drawerBox(dg, b){
 }
 
 function frontTrim(dg, x0, x1, y0, y1, zf, mat, glassHole, force){ // glassHole: camlı kapağın açıklığı {x0, x1, y0, y1} — şerit çubuklar camın üstünden geçmez (çerçevede kısa parçalar)
-  const tl = trimLayout(force ? Object.assign({}, cfg.front, {style: force}) : cfg.front, x1 - x0, y1 - y0, cfg.handle); if (!tl) return;
+  const tl = trimLayout(force ? Object.assign({}, cfg.front, {style: force}) : cfg.front, x1 - x0, y1 - y0); if (!tl) return;
   // camlı kapakta açıklığın çevresine de çıta (kullanıcı 2026-10-20): çerçeve tipinde aynı profil, şeritte oval; çıta açıklığın kenarında çerçevenin üstünde, şerit çubuklar bu çıtada biter
   const GB = 10, inner = () => { if (glassHole && !force) frontTrim(dg, glassHole.x0 - GB, glassHole.x1 + GB, glassHole.y0 - GB, glassHole.y1 + GB, zf, mat, null, tl.kind === 'serit' ? 'oval' : cfg.front.style); };
   if (tl.kind === 'serit'){
-    y1 -= tl.cut;
     // yarım yuvarlak çubuklar (boy başına tek geometri, çubuklarda tekrar kullanılır)
     const r = tl.sw/2, tile = (mat.userData && mat.userData.tile) || 0, geos = {};
     const geoOf = len => geos[len] || (geos[len] = (() => { const geo = new THREE.CylinderGeometry(r, r, len, 10, 1, false, -Math.PI/2, Math.PI);
@@ -2627,8 +2626,8 @@ function frontTrim(dg, x0, x1, y0, y1, zf, mat, glassHole, force){ // glassHole:
     inner(); return;
   }
   // çerçeve çıtası: oval = yuvarlatılmış profil, köşe = keskin profil
-  const bv = tl.round ? 3.5 : 0, ox0 = x0 + tl.m + bv, ox1 = x1 - tl.m - bv, oy0 = y0 + tl.m + bv, oy1 = y1 - tl.m - bv;
-  const ix0 = x0 + tl.m + tl.bw - bv, ix1 = x1 - tl.m - tl.bw + bv, iy0 = y0 + tl.m + tl.bw - bv, iy1 = y1 - tl.m - tl.bw + bv;
+  const bv = tl.round ? 3.5 : 0, ox0 = x0 + bv, ox1 = x1 - bv, oy0 = y0 + bv, oy1 = y1 - bv;
+  const ix0 = x0 + tl.bw - bv, ix1 = x1 - tl.bw + bv, iy0 = y0 + tl.bw - bv, iy1 = y1 - tl.bw + bv;
   const sh = new THREE.Shape(); sh.moveTo(ox0, oy0); sh.lineTo(ox1, oy0); sh.lineTo(ox1, oy1); sh.lineTo(ox0, oy1); sh.lineTo(ox0, oy0);
   const hole = new THREE.Path(); hole.moveTo(ix0, iy0); hole.lineTo(ix0, iy1); hole.lineTo(ix1, iy1); hole.lineTo(ix1, iy0); hole.lineTo(ix0, iy0); sh.holes.push(hole);
   const geo = new THREE.ExtrudeGeometry(sh, tl.round ? {depth: Math.max(.5, tl.dep - 2*bv), bevelEnabled: true, bevelThickness: bv, bevelSize: bv, bevelSegments: 6} : {depth: tl.dep, bevelEnabled: false});
@@ -2649,7 +2648,7 @@ function frontTrim(dg, x0, x1, y0, y1, zf, mat, glassHole, force){ // glassHole:
   const mesh = new THREE.Mesh(geo, mat); mesh.position.z = zf + bv; mesh.castShadow = mesh.receiveShadow = true; dg.add(mesh); addEdges(mesh, 25);
   // 45° gönye birleşim çizgileri
   if (ui.edges){
-    const zt = zf + tl.dep + .3, a = x0 + tl.m, b = x1 - tl.m, c = y0 + tl.m, d = y1 - tl.m, k = tl.bw;
+    const zt = zf + tl.dep + .3, a = x0, b = x1, c = y0, d = y1, k = tl.bw;
     const pts = [[a, c, a + k, c + k], [b, c, b - k, c + k], [a, d, a + k, d - k], [b, d, b - k, d - k]].flatMap(q => [new THREE.Vector3(q[0], q[1], zt), new THREE.Vector3(q[2], q[3], zt)]);
     const ml = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), M.edge); ml.raycast = () => {}; dg.add(ml);
   }
@@ -3413,7 +3412,7 @@ function renderRight(){
       </div>`;
     }
     else {
-      const L = layoutOf(m), hs = drawerHeights(m), s = sinkOver(m, c, mx), {H, bottomY} = moduleDims(m);
+      const L = layoutOf(m), hs = drawerHeights(m), s = sinkOver(m, c), {H, bottomY} = moduleDims(m);
       body = `<div class="row sp"><h3 class="ttl">M${i+1} · ${TYPES[m.type].label}</h3><span class="tag">${m.width/10}×${Math.round(H/10)}×${c.depth/10}</span></div>
       <p class="hint" style="margin:-8px 0 0">${onBase(m) ? 'Bazalı, 10 cm baza · kapaktan 4 cm geride' : `Alt kenar yerden ${Math.round(bottomY/10)} cm`}${s ? ' · üstünde lavabo var' : ''}</p>
       <div>
@@ -3460,7 +3459,7 @@ function renderRight(){
 const openTargets = () => ui.selSet.size ? cfg.modules.filter(m => ui.selSet.has(m.uid)).map(m => m.uid) : cfg.modules.map(m => m.uid);
 function renderStrip(){
   const mx = moduleX();
-  document.getElementById('strip').innerHTML = cfg.modules.map((m, i) => `<button class="chip" data-act="sel" data-id="${m.uid}" aria-pressed="${ui.selSet.has(m.uid)}">M${i+1} · ${TYPES[m.type].short} · ${m.width/10}${sinkOver(m, cfg, mx) ? ' · L' : ''}</button>`).join('') || '<span class="hint">Dizilim boş</span>';
+  document.getElementById('strip').innerHTML = cfg.modules.map((m, i) => `<button class="chip" data-act="sel" data-id="${m.uid}" aria-pressed="${ui.selSet.has(m.uid)}">M${i+1} · ${TYPES[m.type].short} · ${m.width/10}${sinkOver(m, cfg) ? ' · L' : ''}</button>`).join('') || '<span class="hint">Dizilim boş</span>';
   document.getElementById('warns').innerHTML = warnings().map(w => `<div>${esc(w)}</div>`).join('');
   // kapaklar modül başına açık kalır (ui.openSet); düğme seçili modüllere (seçim yoksa hepsine) uygulanır; 2+ modül açıkken "Tümünü Kapat"
   const ids = new Set(cfg.modules.map(m => m.uid)); [...ui.openSet].forEach(id => { if (!ids.has(id)) ui.openSet.delete(id); });
@@ -3573,7 +3572,7 @@ function drawPos(el){
     oth.forEach(o => { const r = mx.map[o.uid], dd = moduleDims(o, cfg); xE.push(r.x0 - r.lt, r.x1 + r.rt); if (r.lt) xE.push(r.x0); if (r.rt) xE.push(r.x1); xM.push((r.x0 + r.x1)/2);
       if (isUpper(o) || isTall(o)){ yT.push(dd.topY); if (isUpper(o)) yB.push(dd.bottomY); } });
     yB.push(topH(cfg) + UPPER_UP);
-    const pick = (cands, d0) => cands.reduce((b, c) => Math.abs(c.d) < SN && (!b || Math.abs(c.d) < Math.abs(b.d)) ? c : b, null);
+    const pick = cands => cands.reduce((b, c) => Math.abs(c.d) < SN && (!b || Math.abs(c.d) < Math.abs(b.d)) ? c : b, null);
     const snapX = () => { const raw = x00 + dx/s, hw = m.width/2;
       const b = pick([...xE.flatMap(e => [{d: e - (raw - hw), at: e}, {d: e - (raw + hw), at: e}]), ...xM.map(c => ({d: c - raw, at: c}))]);
       return {v: clamp(b ? Math.round(raw + b.d) : Math.round(raw/10)*10, -5000, 5000), at: b ? b.at : null}; };
@@ -4044,7 +4043,7 @@ function renderOrders(){
     </div>
     <h2 class="sec" style="margin-top:20px">Modüller</h2>
     <div class="tbl-wrap"><table><thead><tr><th>Modül</th><th>Tip</th><th>Dizilim</th><th>G × Y × D (cm)</th><th>Özellik</th></tr></thead><tbody>
-      ${oc.modules.map((m, i) => { const mx = moduleX(oc), s = sinkOver(m, oc, mx), dm = moduleDims(m, oc);
+      ${oc.modules.map((m, i) => { const mx = moduleX(oc), s = sinkOver(m, oc), dm = moduleDims(m, oc);
         return `<tr><td class="mono">M${i+1}</td><td>${TYPES[m.type].label}</td><td>${(LAYOUTS[m.type].find(l => l.id === m.layout) || {}).name || ''}</td><td class="mono">${m.width/10} × ${Math.round(dm.H/10)} × ${(isTall(m) || isUpper(m) ? TYPES[m.type].D : oc.depth)/10}</td>
         <td>${[m.hidden ? 'Gizli Çekmece' : '', tallIdr(m).length ? 'İç çekmece: ' + tallIdr(m).join(' · ') : '', s ? 'U kesim (lavabo)' : '', Object.entries(m.org || {}).filter(([k, x]) => +k < drawerHeights(m, oc).length && x && x !== 'yok' && ORGS[x]).map(([, x]) => ORGS[x].label).join(', ')].filter(Boolean).join(' · ') || '—'}</td></tr>`; }).join('')}
     </tbody></table></div>`;
