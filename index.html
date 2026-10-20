@@ -490,6 +490,10 @@ const IDR_MAX = 3, IDR_NL = 300, IDR_GAP = 50;
 const IDR = {M: {space: 109, gallery: false}, C: {space: 191, gallery: true}};
 const tallIdrOK = m => isTall(m) && !tallGolaOnly(m) && !tallPantry(m); // kilerde iç çekmece yok (VS TAL Gate)
 const tallIdr = m => tallIdrOK(m) && Array.isArray(m.idr) ? m.idr : [];
+// İÇ ÇEKMECELİ KAPAKTA BLUM 155° SIFIR TAŞMALI MENTEŞE (kullanıcı 2026-10-20 "robot menteşe"; CLIP top BLUMOTION 71B7550): kapak dolap ağzına girmez, çekmeceler kapağa çarpmaz
+const hinge155 = m => tallIdr(m).length > 0;
+const hingeName = m => hinge155(m) ? 'Blum menteşe 155° geniş açılı, sıfır taşma (CLIP top BLUMOTION 71B7550), siyah' : 'Blum menteşe 107°, siyah (frenli BLUMOTION, tam bindirme)';
+const hingePrice = m => hinge155(m) ? PRICE.hinge155 : PRICE.hinge;
 const idrSizes = n => Array.from({length: n}, (_, j) => n > 1 && j === n - 1 ? 'M' : 'C'); // alttan: 1 → C, 2 → C M, 3 → C C M
 const idrSlot = k => IDR[k].space; // Blum'un dolapta istediği yükseklik: M 109, C 191 mm
 const shelfN = span => Math.max(0, Math.round(span/300) - 1);      // ~30 cm aralıkla ayarlı raf
@@ -724,7 +728,7 @@ const STATUSES = [
 const PRICE = {
   m2:{kaplama19:144, kaplama9:96.68, lam18:37.17, lam9:26.51, lake18:92, lake9:60}, // satış €/m² (kaplama, lam gerçek; lam9 = 8 mm plaka)
   m2Col:{dcsgb:{lam18:29.736, lam9:23.494}}, // renge özel m² fiyatı (yoksa m2): DCS-G-B ucuz; ÇB, T, S m2'deki fiyat
-  gloss:1.2, hinge:9.28 /* Blum 107° siyah frenli, adet */, pin:0.56 /* raf pimi, adet */, screw:0.56 /* gövde birleştirme vidası, adet */, tipOn:11.8 /* Blum TIP-ON push-open: kapak ve çekmece aparatı, adet */,
+  gloss:1.2, hinge:9.28 /* Blum 107° siyah frenli, adet */, hinge155:10.72 /* Blum 155° geniş açılı, sıfır taşma (iç çekmeceli kapak), adet */, pin:0.56 /* raf pimi, adet */, screw:0.56 /* gövde birleştirme vidası, adet */, tipOn:11.8 /* Blum TIP-ON push-open: kapak ve çekmece aparatı, adet */,
   pull:14.28, // çubuk kulp, adet (GEÇİCİ — kullanıcı: net değil; model/boy/renge göre teyit edilecek)
   golaM:{alu:39.4, front:88.786}, // gola profili €/m (J ve C aynı): alüminyum siyah / ahşap (kapak malzemesi)
   ucut:0 /* U kesim işçiliği fiyata girmez (kullanıcı) */, plinth:2 /* ayarlı baza ayağı, ADET (modül başına 4) */,
@@ -1155,8 +1159,8 @@ function cutList(c = cfg){
       push('Kapak (sağ)', mod, 1, dH, DW, fT, fName, fKey, (m.elcikSide === 'R' ? el : '') + 'menteşe sağ' + st);
       hw.push({item:`Elcik oyma işçiliği (CNC, ${m.elcikSide === 'R' ? 'sağ' : 'sol'} kapak)`, mod, qty:1, price:0});
       // elcikli kapak her zaman düz: çıta satırı yok
-      hw.push({item:'Blum menteşe 107°, siyah (frenli BLUMOTION, tam bindirme) · sol', mod, qty:hingeN(dH), price:PRICE.hinge});
-      hw.push({item:'Blum menteşe 107°, siyah (frenli BLUMOTION, tam bindirme) · sağ', mod, qty:hingeN(dH), price:PRICE.hinge});
+      hw.push({item:`${hingeName(m)} · sol`, mod, qty:hingeN(dH), price:hingePrice(m)});
+      hw.push({item:`${hingeName(m)} · sağ`, mod, qty:hingeN(dH), price:hingePrice(m)});
       hw.push({item:'Gizli askı mekanizması', mod, qty:2, price:0});
       hw.push({item:'Raf pimi', mod, qty:4*nSh, price:PRICE.pin});
       return;
@@ -1175,8 +1179,8 @@ function cutList(c = cfg){
       push('Kapak (sol)', mod, 1, dH, DW, fT, fName, fKey, 'menteşe sol' + st);
       push('Kapak (sağ)', mod, 1, dH, DW, fT, fName, fKey, 'menteşe sağ' + st);
       trimRows('Kapak (sol) çıtası', mod, DW, dH, th); trimRows('Kapak (sağ) çıtası', mod, DW, dH, th);
-      hw.push({item:'Blum menteşe 107°, siyah (frenli BLUMOTION, tam bindirme) · sol', mod, qty:hingeN(dH), price:PRICE.hinge});
-      hw.push({item:'Blum menteşe 107°, siyah (frenli BLUMOTION, tam bindirme) · sağ', mod, qty:hingeN(dH), price:PRICE.hinge});
+      hw.push({item:`${hingeName(m)} · sol`, mod, qty:hingeN(dH), price:hingePrice(m)});
+      hw.push({item:`${hingeName(m)} · sağ`, mod, qty:hingeN(dH), price:hingePrice(m)});
       hw.push({item:'Gizli askı mekanizması', mod, qty:4, price:0});
       hw.push({item:'Raf pimi', mod, qty:8*nSh, price:PRICE.pin});
       hw.push({item:'Gövde birleştirme vidası', mod, qty: H > 1200 ? 4 : 3, price:PRICE.screw});
@@ -1201,7 +1205,7 @@ function cutList(c = cfg){
         push('Kapak (üst)', mod, 1, dUp, DW, fT, fName, fKey, fNote);
         trimRows('Kapak (alt) çıtası', mod, DW, dLo, th); trimRows('Kapak (üst) çıtası', mod, DW, dUp, th);
       }
-      hw.push({item:`Blum menteşe 107°, siyah (frenli BLUMOTION, tam bindirme) · ${side}`, mod, qty: one ? hingeN(dOne) : (tallWash(m) ? 0 : hingeN(dLo)) + hingeN(dUp), price:PRICE.hinge}); // çamaşırda alt kapak menteşesiz
+      hw.push({item:`${hingeName(m)} · ${side}`, mod, qty: one ? hingeN(dOne) : (tallWash(m) ? 0 : hingeN(dLo)) + hingeN(dUp), price:hingePrice(m)}); // çamaşırda alt kapak menteşesiz
       hw.push({item:'Gizli askı mekanizması', mod, qty:2, price:0});
       if (nSh) hw.push({item:'Raf pimi', mod, qty:4*nSh, price:PRICE.pin});
       if (tallWash(m)){ const wm = washModel(W), wd = WASH[wm]; // Vauth-Sagel ENVI Space XX Pro, beyaz (makroaks.com.tr)
@@ -1473,7 +1477,7 @@ const M = {};
 function baseMats(){
   M.lgb = new THREE.MeshStandardMaterial({color: srgb('#232425'), metalness:.05, roughness:.78, envMapIntensity:.25}); // LEGRABOX Carbon black: mat, yansımasız
   M.runner = new THREE.MeshStandardMaterial({color: srgb('#1e1f20'), metalness:.05, roughness:.8, envMapIntensity:.2}); // ray: yanla aynı mat siyah
-  M.hinge = new THREE.MeshStandardMaterial({color: srgb('#202122'), metalness:.35, roughness:.45, envMapIntensity:.35}); // Blum menteşe, siyah (onyx black)
+  M.hinge = new THREE.MeshStandardMaterial({color: srgb('#141516'), metalness:.55, roughness:.26, envMapIntensity:.7}); // Blum menteşe, siyah (onyx black) — parlak (kullanıcının ürün görseli)
   M.alu = new THREE.MeshStandardMaterial({color: srgb('#b9bdc0'), metalness:.85, roughness:.42, envMapIntensity:1});
   M.chrome = new THREE.MeshStandardMaterial({color: srgb('#e8eaec'), metalness:1, roughness:.12, envMapIntensity:1.2});
   M.dark = new THREE.MeshStandardMaterial({color: srgb('#151515'), roughness:.8});
@@ -1779,7 +1783,8 @@ function buildScene(){
   c.sinks.forEach(s => buildSink(s, mx));
   c.mirrors.forEach(mi => buildMirror(mi));
   if (c.modules.length) buildSides(mx);
-  drawerGroups.forEach(g => { const p = prevState.get(g.userData.key); if (!p) return; g.position.z = p.z; g.rotation.y = p.ry; if (p.ic != null) g.userData.ic = p.ic; });
+  drawerGroups.forEach(g => { const p = prevState.get(g.userData.key); if (!p) return; g.position.z = p.z; g.rotation.y = p.ry; if (p.ic != null) g.userData.ic = p.ic;
+    if (g.userData.pose) g.userData.pose(); else if (g.userData.hz0 != null) g.position.z = g.userData.hz0; }); // menteşeli kapak: konum açıdan (107° dört çubuk); 155° kapak kaymaz (menteşe tipi değişince eski kayma kalmasın)
   if (ui.dims && c.modules.length) buildDims(mx);
 }
 
@@ -2082,6 +2087,115 @@ function washBin(par, w, d, h, x, y0, z, rimMat){
   [-1, 1].forEach(s => { const e = cyl(4, 14, rimMat, g, 'z'); e.position.set(s*w*.275, h + 6, d/2 - 7); });
   return g;
 }
+/* MENTEŞE DÖRT ÇUBUK (kullanıcı 2026-10-20: "birebir, gerçek menteşe hareketi"): kapak, iki sabit boylu bağlantıyla gövdeye bağlı; kapak açısı θ verilince
+   kapağın kayması (tU, tZ) iki çember kesişiminden bulunur (önceki açıdan sürekli dal). ÇERÇEVE: U = kapak kenarından içeri (kapalıyken), Z = kapağın ön yüzü 0,
+   arka yüzü −fT, gövde önü −fT; yan panel U ∈ [−g, T − g] (g: kapak kenarı ile yan panel dış yüzü arası). Mafsal noktaları 250 bin denemelik aramayla seçildi
+   (T = fT = 19, g = 3): kapak 90°'de yan panelin önünde (arka yüzü yan panelin iç yüzü hizasında), kapamaya taşma ≤ 1 mm, gövdeye girmez, 0–105° kesintisiz.
+   A: kolun ucunda (gövdede), B: kabın içinde (kapakta); bağlantı boyları ~23 / ~32 mm */
+// 2026-10-20 ikinci arama (kullanıcı: "menteşe kapağa giriyor"): B pimleri kapağın ARKA YÜZÜNÜN 5–6,5 mm GERİSİNDE (mafsal yuvasının içinde), bağlantılar kapağa değmez;
+// kapamaya taşma 0, 90°'de arka yüz yan panelin iç yüzünden ~3 mm içeride, hareket yumuşak (adım ≤ 1,3 mm / 2°)
+const HINGE4 = {A1: [8.046, -4.930], A2: [20.609, -2.084], B1: [4.847, -6.504], B2: [11.159, -5.420]};
+const hingeKinCache = {};
+function hingeKin(T, fT, g){
+  const key = T + ':' + fT + ':' + g; if (hingeKinCache[key]) return hingeKinCache[key];
+  const A1 = [T - g + HINGE4.A1[0], -fT + HINGE4.A1[1]], A2 = [T - g + HINGE4.A2[0], -fT + HINGE4.A2[1]], B1 = [HINGE4.B1[0], -fT + HINGE4.B1[1]], B2 = [HINGE4.B2[0], -fT + HINGE4.B2[1]];
+  const L1 = Math.hypot(A1[0] - B1[0], A1[1] - B1[1]), L2 = Math.hypot(A2[0] - B2[0], A2[1] - B2[1]);
+  const step = (th, prev) => { const c = Math.cos(th), s = Math.sin(th), rot = ([a, b]) => [a*c - b*s, a*s + b*c];
+    const dd = rot([B2[0] - B1[0], B2[1] - B1[1]]), C2 = [A2[0] - dd[0], A2[1] - dd[1]], dx = C2[0] - A1[0], dz = C2[1] - A1[1], D = Math.hypot(dx, dz);
+    if (D > L1 + L2 || D < Math.abs(L1 - L2) || D < 1e-9) return null;
+    const a = (L1*L1 - L2*L2 + D*D)/(2*D), h = Math.sqrt(Math.max(0, L1*L1 - a*a)), mx = A1[0] + a*dx/D, mz = A1[1] + a*dz/D;
+    const P = [[mx + h*dz/D, mz - h*dx/D], [mx - h*dz/D, mz + h*dx/D]].sort((u, v) => Math.hypot(u[0]-prev[0], u[1]-prev[1]) - Math.hypot(v[0]-prev[0], v[1]-prev[1]))[0];
+    const rb = rot(B1); return {t: [P[0] - rb[0], P[1] - rb[1]], P}; };
+  const tab = []; let prev = B1; // 0–110° arası 0,5° adımlı tablo (sürekli dal), ara açılar doğrusal
+  for (let k = 0; k <= 220; k++){ const r = step(k/2*Math.PI/180, prev); if (!r){ tab.push(tab[tab.length - 1] || [0, 0]); continue; } prev = r.P; tab.push(r.t); }
+  const pose = th => { const f = clamp(th*180/Math.PI*2, 0, 220), i = Math.floor(f), j = Math.min(220, i + 1), u = f - i; return [tab[i][0] + (tab[j][0] - tab[i][0])*u, tab[i][1] + (tab[j][1] - tab[i][1])*u]; };
+  return hingeKinCache[key] = {A1, A2, B1, B2, L1, L2, pose};
+}
+function buildHinge(g, dg, {xi, si, sgn, hy, cd, fT, T, gap, px, z155}){
+  // Blum CLIP top BLUMOTION (kullanıcının ürün görseli; Blum verisi: kap Ø35, 45/9,5 delik düzeni, plaka vidası önden 37, system 32): parlak siyah,
+  // pahlı parçalar; kol ucundaki iki pim (A1, A2) ile kabın içindeki iki pim (B1, B2) arasında SABİT BOYLU iki bağlantı — kapak hingeKin ile hareket ettiği için
+  // bağlantılar hiç uzayıp kısalmaz (gerçek mekanizma)
+  const H = M.hinge, dk = M.hingeDark || (M.hingeDark = new THREE.MeshStandardMaterial({color: srgb('#050505'), metalness: .1, roughness: .85}));
+  const pin = M.hingePin || (M.hingePin = new THREE.MeshStandardMaterial({color: srgb('#2b2c2e'), metalness: .75, roughness: .25, envMapIntensity: .8}));
+  const rr = (w, h, r) => { const s = new THREE.Shape(), a = w/2, b = h/2; r = Math.min(r, a - .01, b - .01); s.moveTo(-a + r, -b); s.lineTo(a - r, -b); s.quadraticCurveTo(a, -b, a, -b + r); s.lineTo(a, b - r); s.quadraticCurveTo(a, b, a - r, b); s.lineTo(-a + r, b); s.quadraticCurveTo(-a, b, -a, b - r); s.lineTo(-a, -b + r); s.quadraticCurveTo(-a, -b, -a + r, -b); return s; };
+  const bb = (x, y, d, r = 1.5, b = .7) => { const geo = new THREE.ExtrudeGeometry(rr(x - 2*b, y - 2*b, r), {depth: Math.max(.1, d - 2*b), bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 5}); geo.translate(0, 0, -(d - 2*b)/2); return geo; };
+  const put = (geo, mat, par, x, y, z) => { const ms = new THREE.Mesh(geo, mat); ms.position.set(x, y, z); ms.castShadow = ms.receiveShadow = true; par.add(ms); return ms; };
+  const cyl = (r, h, mat, par, x, y, z, ax) => { const ms = put(new THREE.CylinderGeometry(r, r, h, 28), mat, par, x, y, z); if (ax === 'x') ms.rotation.z = Math.PI/2; if (ax === 'z') ms.rotation.x = Math.PI/2; return ms; };
+  const kin = hingeKin(T, fT, gap), z0 = cd + fT;
+  const W = ([U, Z]) => [px + sgn*U, z0 + Z];          // gövdede: mekanizma çerçevesi → dünya (mm)
+  const Dl = ([a, b]) => [sgn*a, b];                   // kapakta: mekanizma çerçevesi → kapak grubu (dg) yereli
+  const xu = u => xi + si*u;                           // yan panelin iç yüzünden içeri u mm
+  const phX = (x, y, z) => { cyl(4.2, 1.6, pin, g, x, y, z, 'x'); put(new THREE.BoxGeometry(.5, 5, 1), dk, g, x + si*.6, y, z); put(new THREE.BoxGeometry(.5, 1, 5), dk, g, x + si*.6, y, z); }; // yıldız başlı vida (gövdede)
+  const phZ = (x, y, z) => { cyl(3.8, 1.4, pin, dg, x, y, z, 'z'); put(new THREE.BoxGeometry(4.4, .9, .5), dk, dg, x, y, z - .6); put(new THREE.BoxGeometry(.9, 4.4, .5), dk, dg, x, y, z - .6); }; // (kapakta)
+  // ---------- GÖVDE: artı biçimli montaj plakası + kol + kol başı (A pimleri) ----------
+  // BLUM TEKNİK FÖYÜ (CLIP top BLUMOTION 110°, s. 4): menteşe kapağın arka yüzünden 66,5 mm içeri uzanır; plaka vidaları önden 37 mm, üst üste 32 mm arayla
+  // (artı biçimli plaka); kolun yan panelden çıkıntısı 0 plakada 21,5 mm (S); kap Ø35 × 13 mm
+  const zP = cd - 37;                                                                      // plaka vidaları önden 37 mm
+  put(bb(3, 15, 40, 3, .5), H, g, xu(1.5), hy, cd - 40);                                   // plakanın boyuna kolu (kolun altında)
+  put(bb(2.5, 44, 11, 4, .5), H, g, xu(1.25), hy, zP);                                     // dikey kanatlar (artı)
+  [-16, 16].forEach(dy => cyl(3.8, 1.2, pin, g, xu(3), hy + dy, zP, 'x'));                  // kanat vidaları (32 mm arayla)
+  const aB = cd - (z155 ? 62 : 66.5), aF = cd - 14;                                        // kol gövdesi 14 (u) × 16 (y): kapak arka yüzünden 66,5 mm (155°: föyde 62)
+  put(bb(14, 16, aF - aB, 2, .9), H, g, xu(10), hy, (aB + aF)/2);
+  put(bb(5, 10, 8, 1, .4), H, g, xu(1.5), hy, aB + 8);                                     // klips dili
+  // 155° sıfır taşmalı: kapak dış ön köşesi etrafında döner; kol başında tek pim (A), kabın içinde tek pim (B), arada DİRSEKLİ iki parçalı mafsal (sabit boylu)
+  // A ve B hesapla seçildi (kullanıcı 2026-10-20: "çekmece sayısı değişince menteşe kapağa girdi" — kapanırken dirsek kapağın içine katlanıyordu):
+  // iki bağlantı (± 4 / 4,5 mm) ve dirsek pimi 0–155° boyunca kapağa hiç girmez; dirsek hep gövde önünün gerisine katlanır
+  const Z1 = [T - gap + 15, -fT - 4], ZB = [18, -fT - 13]; // B kapağın arka yüzünün 6,5 mm gerisinde, mafsal yuvasının içinde (bağlantı kapağa girmesin; kullanıcı 2026-10-20)
+  const A1 = W(z155 ? Z1 : kin.A1), A2 = W(z155 ? Z1 : kin.A2);                          // kol başı: pimleri taşır, gövde önüne kadar
+  const hz0 = Math.min(A1[1], A2[1], aF) - 4, hz1 = Math.min(cd - .5, Math.max(A1[1], A2[1]) + 3.5); // kol başı gövde önünü geçmez (kapalı kapağa girmesin)
+  put(bb(18, 16, hz1 - hz0, 2.5, .9), H, g, xu(11), hy, (hz0 + hz1)/2);
+  const top = xu(17);                                                                       // kolun iç (görünen) yüzü
+  put(bb(1, 7, 9, 1.5, .2), dk, g, top, hy, cd - 40);                                      // pencere
+  phX(top + si*.4, hy, cd - 30); phX(top + si*.4, hy, cd - 50);                            // ayar vidaları
+  [0, 1, 2].forEach(k => put(new THREE.BoxGeometry(.8, 11, 1.2), dk, g, top, hy, aB + 3.5 + k*2.8)); // arka oluklar
+  [-1, 1].forEach(sy => { cyl(2.4, 1, pin, g, xu(10), hy + sy*8.3, cd - 56);              // perçin
+    [A1, A2].forEach(A => cyl(3.1, 1.2, pin, g, A[0], hy + sy*8.4, A[1])); });             // mafsal pimleri (kol başında)
+  // ---------- KAPAK: kap (Ø35), flanş, mafsal yuvası, BLUMOTION ----------
+  const cx = sgn*22.5, zb = -fT;
+  cyl(19, 1.2, H, dg, cx, hy, zb - .6, 'z');                                                // kap ağzı halkası
+  cyl(16.8, 1.4, dk, dg, cx, hy, zb - .5, 'z');                                             // kabın içi (karanlık)
+  const fh = z155 ? 3.2 : 2.2;                                                              // flanş: 155° föyde 57 × 22 × 3,2
+  put(z155 ? bb(22, 57, 3.2, 5, .6) : bb(17, 56, 2.2, 5, .5), H, dg, cx + sgn*9.5, hy, zb - fh/2); // vida kanadı (45/9,5)
+  [-22.5, 22.5].forEach(dy => { cyl(4.6, .6, dk, dg, cx + sgn*9.5, hy + dy, zb - fh - .1, 'z'); phZ(cx + sgn*9.5, hy + dy, zb - fh - .4); });
+  { const b1 = Dl(z155 ? ZB : kin.B1), b2 = Dl(z155 ? ZB : kin.B2), ka = (b1[0] + b2[0])/2; // mafsal yuvası: B pimlerinin çevresinde, kabın kenar tarafında
+    if (z155) put(bb(11, 22, 15, 3, .7), H, dg, sgn*(T - gap + 6), hy, zb - 7.5);        // 155°: B'yi saran yuva, kapalıyken yan panelin iç yüzünün içinde kalır (panele girmez)
+    else put(bb(15, 20, 9.5, 2.5, .6), H, dg, ka + sgn*2, hy, zb - 4.75); }
+  put(bb(9, 11, 7, 2, .5), H, dg, cx + sgn*9, hy + 12, zb - 4.5);                          // BLUMOTION sönümleyici
+  put(bb(3, 6, 4.5, .8, .3), pin, dg, cx + sgn*12, hy + 15, zb - 8.5);                     // kapatma dili
+  // ---------- BAĞLANTILAR (sabit boy): A (gövde) → B (kapak), her çizimde ----------
+  const Z = new THREE.Vector3(0, 0, 1), Bv = new THREE.Vector3(), Dv = new THREE.Vector3();
+  if (z155){ // DİRSEKLİ MAFSAL: kol pimi A → dirsek J (L1) → kap pimi B (L2); boylar sabit, J iki çember kesişiminden (önceki konuma yakın dal)
+    const Bl = Dl(ZB), rot = th => { const c = Math.cos(th), s = Math.sin(th); return ([a, b]) => [a*c - b*s, a*s + b*c]; };
+    let dmax = 0, d0 = 1e9; for (let k = 0; k <= 62; k++){ const q = rot(k/62*155*Math.PI/180)(ZB), d = Math.hypot(q[0] - Z1[0], q[1] - Z1[1]); dmax = Math.max(dmax, d); d0 = Math.min(d0, d); }
+    const L2 = (dmax + d0)/2 + 1, L1 = (dmax - d0)/2 + 1;                                  // kapalıyken katlanır (L2 − L1 ≈ en kısa), tam açıkta neredeyse düz
+    // dirsek hep AYNI YÖNE katlanır: kapanıştan sürekli izlenen yolda (mekanizma çerçevesinde) A→B'ye göre J'nin tarafı; sahne açık kapakla kurulsa da ters dönmez
+    // mekanizma ~25°'de tam katlanmadan geçer: taraf açıya göre değişir → her derece için kapanıştan sürekli izlenen yoldaki taraf tablosu
+    const sides = (() => { let Jp = [Z1[0] - .5, Z1[1] - L1]; const s = []; for (let k = 0; k <= 160; k++){ const B = rot(Math.max(k, .5)*Math.PI/180)(ZB), dx = B[0] - Z1[0], dz = B[1] - Z1[1], n = Math.hypot(dx, dz) || 1, D = Math.min(L1 + L2 - 1e-6, Math.max(Math.abs(L1 - L2) + 1e-6, n));
+      const a = (L1*L1 - L2*L2 + D*D)/(2*D), h = Math.sqrt(Math.max(0, L1*L1 - a*a)), ux = dx/n, uz = dz/n, c1 = [Z1[0] + a*ux - h*uz, Z1[1] + a*uz + h*ux], c2 = [Z1[0] + a*ux + h*uz, Z1[1] + a*uz - h*ux];
+      Jp = Math.hypot(c1[0] - Jp[0], c1[1] - Jp[1]) <= Math.hypot(c2[0] - Jp[0], c2[1] - Jp[1]) ? c1 : c2; s.push(Math.sign(dx*(Jp[1] - Z1[1]) - dz*(Jp[0] - Z1[0])) * sgn); } return s; })(); // dünyada aynalanınca işaret sgn ile döner
+    const Av = new THREE.Vector3(A1[0], hy, A1[1]), J = new THREE.Vector3();
+    const solveJ = () => { Bv.set(Bl[0], hy, Bl[1]); dg.localToWorld(Bv); g.worldToLocal(Bv);
+      const dx = Bv.x - Av.x, dz = Bv.z - Av.z, D = Math.max(1e-6, Math.min(L1 + L2 - 1e-6, Math.max(Math.abs(L1 - L2) + 1e-6, Math.hypot(dx, dz))));
+      const a = (L1*L1 - L2*L2 + D*D)/(2*D), h = Math.sqrt(Math.max(0, L1*L1 - a*a)), n = Math.hypot(dx, dz) || 1, ux = dx/n, uz = dz/n;
+      const c1 = [Av.x + a*ux - h*uz, Av.z + a*uz + h*ux], c2 = [Av.x + a*ux + h*uz, Av.z + a*uz - h*ux];
+      const side = sides[Math.min(160, Math.round(Math.abs(dg.rotation.y)*180/Math.PI))];
+      const s1 = Math.sign(dx*(c1[1] - Av.z) - dz*(c1[0] - Av.x)), pick = s1 === side ? c1 : c2; J.set(pick[0], hy, pick[1]); };
+    const seg = (w, t, dy, from) => { const ms = new THREE.Mesh(bb(w, t, 1, .8, .3).translate(0, 0, .5), H); ms.frustumCulled = false; g.add(ms);
+      ms.onBeforeRender = () => { solveJ(); const P0 = from === 'A' ? Av.clone() : J.clone(), P1 = from === 'A' ? J.clone() : Bv.clone(); P0.y = P1.y = hy + dy;
+        Dv.subVectors(P1, P0); const L = Math.max(.01, Dv.length()); ms.position.copy(P0); ms.quaternion.setFromUnitVectors(Z, Dv.normalize()); ms.scale.set(1, 1, L); ms.updateMatrixWorld(true); }; };
+    [-6.8, 6.8].forEach(dy => seg(7, 2.4, dy, 'A'));                                         // kol tarafı: iki yan plaka
+    seg(8, 11, 0, 'J');                                                                      // kap tarafı: ortada dolu kol
+    const jt = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, 16.5, 20), pin); jt.frustumCulled = false; g.add(jt); // dirsek pimi
+    jt.onBeforeRender = () => { solveJ(); jt.position.copy(J); jt.updateMatrixWorld(true); };
+    return;
+  }
+  [[A1, kin.B1, 6, 2, [-6.6, 6.6]], [A2, kin.B2, 8, 8, [0]]].forEach(([A, Bk, w, t, dys]) => dys.forEach(dy => {
+    const ms = new THREE.Mesh(bb(w, t, 1, .8, .3).translate(0, 0, .5), H); ms.frustumCulled = false; g.add(ms);
+    const Av = new THREE.Vector3(A[0], hy + dy, A[1]), bl = Dl(Bk);
+    ms.onBeforeRender = () => { Bv.set(bl[0], hy + dy, bl[1]); dg.localToWorld(Bv); g.worldToLocal(Bv); Dv.subVectors(Bv, Av); const L = Math.max(.01, Dv.length());
+      ms.position.copy(Av); ms.quaternion.setFromUnitVectors(Z, Dv.normalize()); ms.scale.set(1, 1, L); ms.updateMatrixWorld(true); };
+  }));
+}
 function buildTall(m, x0, idx, mx){
   const c = cfg, D = TYPES[m.type].D, T = matT(c.body.mat), fT = matT(c.front.mat), cd = D - fT;
   const {H, bottomY} = moduleDims(m), W = m.width, cx = x0 + W/2, top = bottomY + H;
@@ -2141,7 +2255,7 @@ function buildTall(m, x0, idx, mx){
     ti.rows.forEach((r, k) => {
       const ig = new THREE.Group(), yb = bottomY + r.yb, dist = 230 - k*20, gal = IDR[r.k].gallery, bh = r.bh; g.add(ig);
       drawerBox(ig, {x0: x0 + T + 13, x1: x0 + W - T - 13, yb, hb: r.sh, lgb: ['M', r.sh], bh, z0, z1}); // yan rayın üstünde, ön panelle (anma ölçüsü) sıfır
-      box(W - 2*T - 28, r.fh, 12, M.lgb, cx, bottomY + r.fy + r.fh/2, z1 - 6, ig);
+      box(W - 2*T - 26, r.fh, 12.5, M.lgb, cx, bottomY + r.fy + r.fh/2, z1 - 5.75, ig); // metal iç ön panel: tabanın / yanların ön ucundan 0,5 mm önde ve yanları örter (aynı düzlemde çakışıp titremesin — kullanıcı 2026-10-20)
       if (gal) [x0 + T + 13 + S/2, x0 + W - T - 13 - S/2].forEach(sx => box(S, 10, z1 - z0, M.lgb, sx, yb + BT + bh - 5, (z0 + z1)/2, ig)); // galeri rayı (yassı profil)
       ig.userData.key = m.uid + ':i' + k; ig.userData.target = () => 0;
       ig.userData.update = () => {
@@ -2172,11 +2286,7 @@ function buildTall(m, x0, idx, mx){
     // SİYAH BLUM MENTEŞE (kapak açılınca görünür): kapakta Ø35 kap (kapak arkasında, kenardan 22,5 mm), gövdede yan panelin iç yüzünde
     // montaj plakası + kol (ön kenara kadar). Adet parça listesiyle aynı (hingeN); uçlardan 100 mm, aradakiler eşit aralıklı
     if (!d.pull){ const tin = tallInterior(m, c), hys = hingeYs(d.y0, d.y1, tin.rows.map(r => [bottomY + r.fy, bottomY + r.fy + r.fh]), tin.fixed.map(f => [bottomY + f.y - T/2, bottomY + f.y + T/2])), xi = R ? x0 + W - T : x0 + T, si = R ? -1 : 1;
-      hys.forEach(hy => {
-        const cup = cyl(17.5, 2.5, M.hinge, dg, 'z'); cup.position.set(sgn*22.5, hy, -fT - 1.25);                       // kap flanşı (kapak arkasında)
-        box(10, 46, 34, M.hinge, xi + si*5, hy, cd - 37 - 17, g);                                                     // montaj plakası (yan panelde, önden 37 mm)
-        box(9, 16, 52, M.hinge, xi + si*5, hy, cd - 26, g);                                                           // kol: plakadan ön kenara
-      }); }
+      hys.forEach(hy => buildHinge(g, dg, {xi, si, sgn, hy, cd, fT, T, gap: R ? df.r : df.l, px, z155: hinge155(m)})); }
     if (pair && th === 'elcik' && (R ? 'R' : 'L') === m.elcikSide){ // B2 elcikli: elcik yalnız seçilen kapakta (m.elcikSide), iç (birleşim) kenarda dikdörtgen oyuk (ELCIK), kapak kalınlığı boyunca
       // kesit (kullanıcının yan kesiti): ön yüzde ELCIK.h (300) açıklık, ELCIK.lip (2) düz + ELCIK.ch (12) pahla içte ELCIK.hIn (360)'e genişler;
       // cebin dibinde kapak eti (kalınlık = kapak − 14) kalır (oyma, tek parça). Kapak gövdesi 360 boşlukla kesilir, ön dil, pahlar ve cep dibi ayrı mesh
@@ -2224,7 +2334,12 @@ function buildTall(m, x0, idx, mx){
       const hh = cyl(6, hl, handleMat(m.handleColor), dg); hh.position.set(hx, hy, 22);
       [-1, 1].forEach(s2 => { const p = cyl(5, 22, handleMat(m.handleColor), dg, 'z'); p.position.set(hx, hy + s2*(hl/2 - 10), 11); });
     }
-    const open = (R ? 1 : -1) * Math.PI*.58; // ~105°
+    const z155 = hinge155(m); // iç çekmeceli kapak: 155° sıfır taşmalı menteşe — kapak dış ön köşesi etrafında döner (dolap ağzına girmez), 155°'ye açılır
+    if (!d.pull) dg.userData.hz0 = dg.position.z; // menteşeli kapağın kapalı konumu (sahne yeniden kurulunca eski kayma taşınmasın)
+    const open = (R ? 1 : -1) * (z155 ? 155*Math.PI/180 : Math.PI*.58); // 107° menteşede ~105°
+    // GERÇEK MENTEŞE HAREKETİ (kullanıcı 2026-10-20): kapak dört çubuklu mekanizmayla hem döner hem kayar (hingeKin); menteşesiz çamaşır kapağı ve 155° hariç
+    if (!d.pull && !z155){ const kin = hingeKin(T, fT, R ? df.r : df.l), z0 = dg.position.z; dg.userData.kin = kin;
+      dg.userData.pose = () => { const t = kin.pose(Math.abs(dg.rotation.y)); dg.position.x = px + sgn*t[0]; dg.position.z = z0 + t[1]; }; }
     dg.userData.target = () => ui.openSet.has(m.uid) || idrGs.some(i => i.position.z > 8) ? 1 : 0; // iç çekmeceler girmeden kapak kapanmaz
     doorGs.push(dg);
     if (d.pull){ // B1 Çamaşır alt kapağı: menteşesiz, çekmece gibi DÜZ ÖNE çekilir; ENVI Space XX Pro taşıyıcısı ve sepetler kapakla birlikte gelir, sürgülü üst kapak gövdede kalır
@@ -2233,7 +2348,7 @@ function buildTall(m, x0, idx, mx){
       const z0d = cd + fT, dist = Math.round((cd - TALL_BACK(c))*.85);                                         // tam açılım (sepet derinliğinin büyük kısmı dışarı)
       dg.userData.update = () => { const goal = z0d + (ui.openSet.has(m.uid) ? dist : 0); [dg.position.z, dg.userData.v] = spring(dg.position.z, goal, dg.userData.v || 0, .05); };
     } else
-    dg.userData.update = () => { const goal = dg.userData.target()*open, r = dg.rotation.y; [dg.rotation.y, dg.userData.v] = spring(r, goal, dg.userData.v || 0, 1e-4); };
+    dg.userData.update = () => { const goal = dg.userData.target()*open, r = dg.rotation.y; [dg.rotation.y, dg.userData.v] = spring(r, goal, dg.userData.v || 0, 1e-4); if (dg.userData.pose) dg.userData.pose(); };
     drawerGroups.push(dg);
   });
   if (tGate && doorGs[0]){ const du = doorGs[0].userData.update; doorGs[0].userData.update = () => { du(); tGate.userData.update(); }; } // aynı karede: önce kapak, sonra tepsiler
