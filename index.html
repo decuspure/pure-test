@@ -76,6 +76,19 @@ main.views{flex:1;min-height:0;position:relative}
 #viewport{flex:1;min-height:300px;position:relative;background:var(--stage)}
 #viewport canvas{display:block;width:100%;height:100%;touch-action:none}
 .vp-hud{position:absolute;left:12px;top:12px;display:flex;gap:6px;flex-wrap:wrap}
+/* MODÜL KONUMU (2026-10-20, deneme): plan + ön görünüş, modüller sürüklenerek / oklarla sıralanır */
+.posp{position:absolute;left:10px;right:10px;top:56px;bottom:10px;z-index:6;background:var(--raise);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.22);display:flex;flex-direction:column;overflow:hidden;color:var(--ink)}
+.posp[hidden]{display:none}
+.posp .ph{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.posp .ph b{font-size:14px;white-space:nowrap}.posp .ph .hint{margin:0}
+.posp .ph .x{margin-left:auto;border:0;background:none;font-size:20px;line-height:1;color:var(--muted);cursor:pointer}
+.posp .pb{flex:1;display:flex;gap:8px;padding:8px;min-height:0}
+.posp .pv{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;overflow:hidden}
+.posp .pv h4{margin:0;padding:7px 10px 0;font-size:10.5px;font-weight:600;letter-spacing:.07em;color:var(--muted)}
+.posp .pv .sv{flex:1;min-height:0;position:relative}.posp .pv svg{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.posp .pm{cursor:grab}.posp .pm.drag{cursor:grabbing;opacity:.85}
+.posp .pf{border-top:1px solid var(--line);padding:7px 12px;display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.posp .pf b{color:var(--ink)}
 .vp-help{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:max-content;max-width:calc(100% - 24px);display:flex;align-items:center;gap:12px;background:var(--ink);color:var(--bg);opacity:.94;font-size:13.5px;line-height:1.5;padding:10px 10px 10px 16px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);transition:opacity .5s;z-index:2}
 .vp-help b{font-weight:600}
 .vp-help button{flex:none;border:0;background:transparent;color:inherit;font-size:18px;line-height:1;cursor:pointer;padding:2px 6px;opacity:.8}
@@ -276,7 +289,9 @@ dialog::backdrop{background:rgba(10,14,13,.45)}
               <button class="btn" data-act="toggle-open" id="b-open">Kapak Aç</button>
               <button class="btn" data-act="close-all" id="b-close-all" hidden>Tümünü Kapat</button>
               <button class="btn on" data-act="toggle-dims" id="b-dims">Ölçüler</button>
+              <button class="btn" data-act="toggle-pos" id="b-pos">Modül Konumu</button>
             </div>
+            <div class="posp" id="posp" hidden></div>
             <div class="vp-help" id="vp-help" role="note"><span id="vp-help-t"></span><button type="button" id="vp-help-x" aria-label="Bilgiyi kapat">×</button></div>
             <div class="vcube" aria-label="Görünüm küpü">
               <div class="vc-wrap">
@@ -400,6 +415,12 @@ const modTop = m => !!m && !TYPES[m.type].tall && !m.noTop;
 const hasTop = (c = cfg) => c.modules.some(modTop); // en az bir modülde tezgah
 const topT = (c = cfg) => hasTop(c) ? c.top.t : 0;
 const panelOn = m => !!m && !TYPES[m.type].tall && !modTop(m) && !!m.topPanel;
+/* MODÜLLER ARASI BOŞLUK (kullanıcı 2026-10-20): m.gapL = modülün SOLUNDAKİ boşluk (mm, 0–1000, 1 cm adım), yalnız iki tezgah altı modülün arasında;
+   Modül Konumu panelinden ayarlanır. Boşlukta tezgah ve baza kesilir (topRuns, plinthRuns); ölçü zincirinde boşluk ölçüsü görünür */
+const GAP_MAX = 1000;
+// kullanıcının açtığı ek boşluk (ilk modülde yok); boy dolap yanında TALL_GAP'in (10 cm) üstüne eklenir — her modülde ayarlı (kullanıcı 2026-10-20)
+const gapOf = (m, c = cfg) => m && m.gapL && c.modules.indexOf(m) > 0 ? m.gapL : 0;
+const tallNext = (m, c = cfg) => { const i = c.modules.indexOf(m), p = c.modules[i - 1]; return i > 0 && (TYPES[m.type].tall || TYPES[p.type].tall); }; // solunda / kendisi boy dolap: en az TALL_GAP
 // üst panel kalınlığı (kullanıcı 2026-10-20): kaplamada 9 / 19, lake'de 8 / 18 mm (m.panelT; normalize malzemeye çevirir, varsayılan kalın = kapak kalınlığı)
 const panelChips = (c = cfg) => c.front.mat === 'kaplama' ? [9, 19] : [8, 18];
 const panelT = (m, c = cfg) => m.panelT || matT(c.front.mat);
@@ -857,7 +878,7 @@ function sidesText(c){
 function moduleX(c = cfg){
   const cm = ctrMods(c);
   // boy dolabın yanında (tezgahlı modülle de, başka boy dolapla da) TALL_GAP boşluk (kapamaların dış yüzleri arası)
-  const gapAt = i => i > 0 && (isTall(c.modules[i]) || isTall(c.modules[i - 1])) ? TALL_GAP : 0;
+  const gapAt = i => (tallNext(c.modules[i], c) ? TALL_GAP : 0) + gapOf(c.modules[i], c); // boy dolap yanında en az TALL_GAP + kullanıcının açtığı boşluk
   const total = c.modules.reduce((s,m,i) => s + gapAt(i) + m.width + msT(m, 'left') + msT(m, 'right'), 0);
   let x = -total/2; const map = {};
   c.modules.forEach((m,i) => { const lt = msT(m, 'left'), rt = msT(m, 'right'), gap = gapAt(i); x += gap + lt; map[m.uid] = {x0:x, x1:x + m.width, i, lt, rt, gap}; x += m.width + rt; });
@@ -868,8 +889,9 @@ function moduleX(c = cfg){
 /* tezgah parçaları: yan yana tezgahlı modüller tek parça (uçlardaki modüllerin dış kapamalarını örter); tezgahsız modülde tezgah kesilir */
 function topRuns(c = cfg, mx = moduleX(c)){
   const out = []; let cur = null;
-  ctrMods(c).forEach(m => { const r = mx.map[m.uid];
-    if (!modTop(m)){ cur = null; return; }
+  c.modules.forEach(m => { const r = mx.map[m.uid];
+    if (!modTop(m)){ cur = null; return; } // boy dolap ve tezgahsız modülde tezgah kesilir
+    if (gapOf(m, c)) cur = null; // modüller arası boşlukta tezgah kesilir (kullanıcı 2026-10-20)
     if (cur){ cur.x1 = r.x1 + r.rt; cur.mods.push(m); } else out.push(cur = {x0: r.x0 - r.lt, x1: r.x1 + r.rt, mods: [m]}); });
   out.forEach(t => t.L = t.x1 - t.x0); return out;
 }function sinkCenterX(s, c = cfg, mx = moduleX(c)){
@@ -926,6 +948,7 @@ function normalize(c = cfg){
   c.modules.forEach(m => { if (isTall(m) || !m.noTop){ delete m.noTop; delete m.topPanel; } else if (!m.topPanel) delete m.topPanel; else m.topPanel = true; });
   if (!FRONT_MATS.includes(c.front.mat)){ // kapakta MDF lam yok (kullanıcı 2026-10-17): yalnız kaplama ve lake — eski lam kapak en yakın lake rengine
     c.front.color = {dcsgb: 'dcs02', dcsgcb: 'dcstn184', dcsgt: 'dcsn27', dcsgs: 'dcsn16'}[c.front.color] || 'dcs02'; c.front.mat = 'lake'; }
+  c.modules.forEach(m => { const g = clamp(Math.round((+m.gapL || 0)/10)*10, 0, GAP_MAX); if (g) m.gapL = g; else delete m.gapL; }); // boşluk 1 cm adım (geçersiz konumda gapOf 0 sayar)
   c.modules.forEach(m => { if (!m.topPanel){ delete m.panelT; return; } const [th, tk] = panelChips(c); m.panelT = (+m.panelT || tk) < 14 ? th : tk; }); // üst panel: ince / kalın, kapak malzemesine göre 9·19 ya da 8·18
   [c.body, c.front].forEach(o => { if (!MATS[o.mat].colors.some(x => x.id === o.color)) o.color = MATS[o.mat].colors[0].id; });
   c.modules.forEach(m => {
@@ -967,13 +990,7 @@ function normalize(c = cfg){
   });
   // organizer: genişlik SON hâline yuvarlandıktan sonra (boy dolaplar genişliği yukarıda kendi kuralıyla değiştirir); genişliğe uymayan / eski adlı düzen → o grubun ilk düzeni; boy dolapta organizer yok
   c.modules.forEach(m => { if (isTall(m)){ m.org = {}; return; } const ok = orgOpts(m.width); Object.keys(m.org).forEach(k => { const v = m.org[k]; if (v && v !== 'yok' && !ok.includes(v)) m.org[k] = ok[0]; }); });
-  // boy dolaplar dizilimin uçlarında durur (tezgah bölünmez): ilk tezgah altı modülden öncekiler solda, diğerleri sağa
-  { const first = c.modules.findIndex(m => !isTall(m));
-    if (first >= 0){ const left = c.modules.slice(0, first), rest = c.modules.slice(first);
-      const moved = rest.filter(isTall), mid = rest.filter(m => !isTall(m));
-      const lastCtr = rest.reduce((k, m, i) => isTall(m) ? k : i, -1);
-      if (rest.slice(0, lastCtr + 1).some(isTall) && c === cfg) toast('Boy dolap tezgahı bölemez; dizilimin sağ ucuna alındı');
-      c.modules = left.concat(mid, moved); } }
+  // BOY DOLAP ARAYA GİREBİLİR (kullanıcı 2026-10-20; eskiden yalnız uçlardaydı): araya girerse tezgah iki yanında ayrı parça olur (topRuns)
   const ids = new Set(ctrMods(c).filter(modTop).map(m => m.uid)); // lavabo yalnız TEZGAHLI tezgah altı modülde (kullanıcı 2026-10-20)
   // lavabolu modül boy dolaba çevrilirse ya da tezgahı kaldırılırsa lavabo silinir (başka modüle taşınmaz; orada zaten lavabo olabilir)
   const noTopSink = c.sinks.some(s => c.modules.some(m => m.uid === s.module && !isTall(m) && !modTop(m)));
@@ -1017,8 +1034,23 @@ function normalize(c = cfg){
   if (c === cfg && !c.sinks.some(s => s.uid === ui.selSink)) ui.selSink = c.sinks[0]?.uid || null;
 }
 
+/* KONUM ÇAKIŞMALARI (kullanıcı 2026-10-20; boy dolap araya girebildiği ve yüksekliği sürüklenebildiği için): ön görünüşte üst üste binen
+   ayna ↔ boy dolap (kapamaları dahil), ayna ↔ ayna, ayna ↔ tezgah; Modül Konumu panelinde kırmızı alan + yazı, genel uyarılarda da */
+function posClashes(c = cfg, mx = moduleX(c)){
+  const out = [], ov = (a, b) => { const x0 = Math.max(a.x0, b.x0), x1 = Math.min(a.x1, b.x1), y0 = Math.max(a.y0, b.y0), y1 = Math.min(a.y1, b.y1); return x1 - x0 > 1 && y1 - y0 > 1 ? {x0, x1, y0, y1} : null; };
+  const mir = c.mirrors.map((mi, k) => ({n: c.mirrors.length > 1 ? `Ayna ${k + 1}` : 'Ayna', x0: mi.x - mi.w/2, x1: mi.x + mi.w/2, y0: mi.bottom, y1: mi.bottom + mi.h}));
+  const talls = c.modules.map((m, i) => ({m, i})).filter(o => isTall(o.m)).map(({m, i}) => { const r = mx.map[m.uid], d = moduleDims(m, c); return {n: `M${i + 1} (boy dolap)`, x0: r.x0 - r.lt, x1: r.x1 + r.rt, y0: d.bottomY, y1: d.topY}; });
+  const th = topH(c), tops = topRuns(c, mx).map(r => ({x0: r.x0, x1: r.x1, y0: 0, y1: th}));
+  mir.forEach((a, k) => {
+    talls.forEach(t => { const o = ov(a, t); if (o) out.push({...o, msg: `${a.n}, ${t.n} ile çakışıyor.`}); });
+    mir.slice(k + 1).forEach(b => { const o = ov(a, b); if (o) out.push({...o, msg: `${a.n} ile ${b.n} üst üste geliyor.`}); });
+    tops.forEach(t => { const o = ov(a, t); if (o) out.push({...o, msg: `${a.n} tezgahın altına iniyor (alt kenar ${String(a.y0/10).replace('.', ',')} cm, tezgah ${String(th/10).replace('.', ',')} cm).`}); });
+  });
+  return out;
+}
 function warnings(c = cfg){
   const out = [], mx = moduleX(c);
+  posClashes(c, mx).forEach(k => { if (!out.includes(k.msg)) out.push(k.msg); });
   if (!c.modules.length) out.push('Dizilimde modül yok. Soldaki kütüphaneden modül ekleyin.');
   // yerin altına inen modül (ör. kalın tezgah + yüksek askı modül ya da boy dolap alt kenarı) uyarısı
   c.modules.forEach((m, i) => { const d = moduleDims(m, c); if (!onBase(m) && d.bottomY < 0) out.push(`M${i+1}: modül yerin altına iniyor (alt kenar ${String(d.bottomY/10).replace('.', ',')} cm).`); });
@@ -1778,7 +1810,8 @@ function carve(w, h, d, mat, x, y, z, parent, extra, vert){ // vert: su yönü d
 function plinthRuns(c = cfg, mx = moduleX(c)){
   const runs = []; let cur = null;
   c.modules.forEach((m, i) => {
-    if (!onBase(m)){ cur = null; return; }
+    if (!onBase(m) || gapOf(m, c)) cur = null; // modüller arası boşlukta baza da bölünür
+    if (!onBase(m)) return;
     const r = mx.map[m.uid];
     if (cur) { cur.x1 = r.x1; cur.i1 = i; } else { cur = {x0: r.x0, x1: r.x1, i0: i, i1: i}; runs.push(cur); }
   });
@@ -3144,7 +3177,94 @@ function renderStrip(){
   const linked = ui.linked && typeof Store !== 'undefined' ? Store.orders.find(o => o.id === ui.linked) : null;
   document.getElementById('linked').innerHTML = linked ? `<button class="btn" data-act="update-order" title="Bu konfigürasyonu siparişe kaydet">${esc(linked.no)} güncelle</button><button class="btn sm" data-act="unlink" aria-label="Sipariş bağlantısını kes">×</button>` : '';
   if (prevDraft) document.getElementById('linked').insertAdjacentHTML('beforeend', `<button class="btn" data-act="restore-prev" title="Yeni açılış tasarımından önce bu tarayıcıda kayıtlı olan tasarımı geri getirir">Önceki tasarımım</button>`);
+  renderPos();
 }
+/* MODÜL KONUMU (kullanıcı 2026-10-20, deneme): "Ölçüler"in yanında düğme; sahnenin üstünde panel — solda PLAN (üstten), sağda ÖN GÖRÜNÜŞ,
+   ikisi aynı ölçekte. Modüle tıkla: seçilir; sürükle: bırakılan yere taşınır (her modül her yere, boy dolap da araya); ön görünüşte boy dolap yukarı / aşağı sürüklenir (yerden yükseklik);
+   alt satırda seçili modül için ← Sola / Sağa → (mevcut 'move'). Yalnız konumlandırma, başka ayar yok */
+function posTarget(m, cx, c = cfg, mx = moduleX(c)){ // modül merkezi cx'e bırakılırsa dizilimdeki yeni sırası ve yerleşme çizgisinin x'i
+  const ctr = o => { const r = mx.map[o.uid]; return (r.x0 + r.x1)/2; }, others = c.modules.filter(o => o !== m);
+  const at = others.filter(o => ctr(o) < cx).length; // her modül her yere (boy dolap da araya) bırakılabilir
+  const edge = o => { const r = mx.map[o.uid]; return [r.x0 - r.lt, r.x1 + r.rt]; };
+  const xMark = !others.length ? cx : at === 0 ? edge(others[0])[0] : at >= others.length ? edge(others[others.length - 1])[1] : (edge(others[at - 1])[1] + edge(others[at])[0])/2;
+  return {at, others, xMark};
+}
+function renderPos(){
+  const el = document.getElementById('posp'); if (!el) return;
+  document.getElementById('b-pos').classList.toggle('on', !!ui.pos); el.hidden = !ui.pos; if (!ui.pos) return;
+  const c = cfg, mx = moduleX(c), sm = c.modules.find(m => m.uid === ui.sel), si = c.modules.indexOf(sm);
+  el.innerHTML = `<div class="ph"><b>Modül konumu</b><p class="hint">Tıklayıp seçin, yana sürükleyerek yerini değiştirin; boy dolabı ön görünüşte yukarı / aşağı sürükleyin. Boşlukta tezgah kesilir.</p><button class="x" data-act="toggle-pos" aria-label="Kapat">×</button></div>
+    <div id="pos-warn" style="display:none;padding:6px 12px;font-size:12px;color:var(--bad);background:var(--bad-soft);border-bottom:1px solid var(--line)"></div>
+    <div class="pb"><div class="pv"><h4>PLAN (ÜSTTEN)</h4><div class="sv" id="pos-plan"></div></div><div class="pv"><h4>ÖN GÖRÜNÜŞ</h4><div class="sv" id="pos-front"></div></div></div>
+    <div class="pf">${sm ? `<b>M${si + 1} · ${TYPES[sm.type].short} · ${sm.width/10} cm</b>
+      <button class="btn sm" data-act="move" data-d="-1" ${si === 0 ? 'disabled' : ''}>← Sola</button><button class="btn sm" data-act="move" data-d="1" ${si === c.modules.length - 1 ? 'disabled' : ''}>Sağa →</button>
+      ${sm && si > 0 ? (() => { const g0 = tallNext(sm, c) ? TALL_GAP : 0; // boy dolap yanında en az 10 cm
+        return `<label style="display:flex;align-items:center;gap:6px;margin-left:6px">Soldaki boşluk <input type="range" id="pos-gap" min="${g0}" max="${g0 + GAP_MAX}" step="10" value="${g0 + (sm.gapL || 0)}" data-g0="${g0}" style="width:120px"><output id="pos-gap-o" style="font-family:var(--f-mono);color:var(--ink)">${(g0 + (sm.gapL || 0))/10} cm</output></label>`; })() : ''}
+      ${sm && isTall(sm) ? `<label style="display:flex;align-items:center;gap:6px;margin-left:6px">Yerden <input type="range" id="pos-bot" min="0" max="1500" step="10" value="${sm.bottom}" style="width:120px"><output id="pos-bot-o" style="font-family:var(--f-mono);color:var(--ink)">${sm.bottom/10} cm</output></label>` : ''}` : '<span>Modül seçili değil</span>'}
+      <button class="btn sm" data-act="toggle-pos" style="margin-left:auto">Tamam</button></div>`;
+  const gi = el.querySelector('#pos-gap'), bi = el.querySelector('#pos-bot');
+  if (gi){ // sürüklerken çizim ve 3B canlı, bırakınca kaydedilir
+    gi.addEventListener('input', () => { const g0 = +gi.dataset.g0; sm.gapL = +gi.value - g0; el.querySelector('#pos-gap-o').textContent = `${+gi.value/10} cm`; buildScene(); drawPos(el); });
+    gi.addEventListener('change', () => refresh({left:false})); }
+  if (bi){ // boy dolabın alt kenarı yerden
+    bi.addEventListener('input', () => { sm.bottom = +bi.value; el.querySelector('#pos-bot-o').textContent = `${sm.bottom/10} cm`; buildScene(); drawPos(el); });
+    bi.addEventListener('change', () => refresh({left:false})); }
+  drawPos(el);
+}
+function drawPos(el){
+  const c = cfg, mx = moduleX(c); if (!c.modules.length) return;
+  const pE = el.querySelector('#pos-plan'), fE = el.querySelector('#pos-front'), pw = pE.clientWidth, ph = pE.clientHeight, fw = fE.clientWidth, fh = fE.clientHeight;
+  const ex = c.modules.map(m => { const r = mx.map[m.uid]; return [r.x0 - r.lt, r.x1 + r.rt]; }), X0 = Math.min(...ex.map(a => a[0])), X1 = Math.max(...ex.map(a => a[1])), L = X1 - X0;
+  const top = topH(c), Hmax = Math.max(top + 150, ...c.modules.map(m => moduleDims(m, c).topY), ...c.mirrors.map(mi => mi.bottom + mi.h)), DM = 620;
+  const s = Math.max(.02, Math.min((pw - 40)/L, (fw - 40)/L, (ph - 40)/DM, (fh - 40)/Hmax)); // iki görünüş aynı ölçekte
+  const ox = w => (w - L*s)/2, Xp = x => ox(pw) + (x - X0)*s, Xf = x => ox(fw) + (x - X0)*s;
+  const pz0 = Math.max(16, (ph - DM*s)/2), pz = z => pz0 + z*s, fy = y => fh - 22 - y*s; // plan dikeyde ortalı
+  const st = (on, fill) => `fill="${on ? 'var(--accent-soft)' : fill}" stroke="${on ? 'var(--accent)' : 'currentColor'}" stroke-width="${on ? 2.2 : 1}"`;
+  let P = `<line x1="8" y1="${pz(0)}" x2="${pw - 8}" y2="${pz(0)}" stroke="currentColor" stroke-width="3"/><text x="10" y="${pz(0) - 5}" font-size="10" fill="var(--muted)">duvar</text>`;
+  let F = `<line x1="8" y1="${fy(0)}" x2="${fw - 8}" y2="${fy(0)}" stroke="currentColor" stroke-width="1.5"/>`;
+  topRuns(c, mx).forEach(r => F += `<rect x="${Xf(r.x0)}" y="${fy(top)}" width="${r.L*s}" height="${Math.max(2.5, c.top.t*s)}" fill="var(--muted)" opacity=".55"/>`);
+  c.mirrors.forEach(mi => F += `<rect x="${Xf(mi.x - mi.w/2)}" y="${fy(mi.bottom + mi.h)}" width="${mi.w*s}" height="${mi.h*s}" rx="${mi.shape === 'dikdortgen' ? 2 : mi.w*s/2}" fill="none" stroke="var(--muted)" stroke-dasharray="4 3"/>`);
+  c.modules.forEach((m, i) => { const r = mx.map[m.uid], d = moduleDims(m, c), on = ui.selSet.has(m.uid), D = isTall(m) ? TYPES[m.type].D : c.depth, cx = (r.x0 + r.x1)/2;
+    const side = (X, y, h, ph2) => [[r.x0 - r.lt, r.lt], [r.x1, r.rt]].map(([x, t]) => t ? `<rect x="${X(x)}" y="${y}" width="${t*s}" height="${h}" fill="var(--line)" stroke="currentColor" stroke-width=".7"/>` : '').join('');
+    P += `<g class="pm" data-uid="${m.uid}">${side(Xp, pz(0), D*s)}<rect x="${Xp(r.x0)}" y="${pz(0)}" width="${m.width*s}" height="${D*s}" ${st(on, 'var(--raise)')}/><text x="${Xp(cx)}" y="${pz(D/2) + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="${on ? 'var(--accent)' : 'currentColor'}">M${i + 1}</text></g>`;
+    F += `<g class="pm" data-uid="${m.uid}">${side(Xf, fy(d.topY), d.H*s)}<rect x="${Xf(r.x0)}" y="${fy(d.topY)}" width="${m.width*s}" height="${d.H*s}" ${st(on, 'var(--raise)')}/><text x="${Xf(cx)}" y="${fy(d.topY) + d.H*s/2 + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="${on ? 'var(--accent)' : 'currentColor'}">M${i + 1}</text></g>`;
+    F += `<text x="${Xf(cx)}" y="${fy(0) + 14}" text-anchor="middle" font-size="10" fill="var(--muted)">${m.width/10}</text>`;
+    if (isTall(m) && d.bottomY > 0){ const xl = Xf(cx); // boy dolap: yerden yükseklik ölçüsü (dikey sürüklenince değişir)
+      F += `<line x1="${xl}" x2="${xl}" y1="${fy(0)}" y2="${fy(d.bottomY)}" stroke="var(--muted)" stroke-dasharray="3 3"/><text x="${xl + 4}" y="${fy(d.bottomY/2) + 4}" font-size="10" fill="var(--muted)">${String(d.bottomY/10).replace('.', ',')}</text>`; }
+    if (r.gap){ const gx = r.x0 - r.lt - r.gap/2, lab = String(r.gap/10).replace('.', ','); // modüller arası boşluk ölçüsü
+      F += `<text x="${Xf(gx)}" y="${fy(0) + 14}" text-anchor="middle" font-size="9.5" fill="var(--accent)">${lab}</text>`;
+      P += `<line x1="${Xp(r.x0 - r.lt - r.gap)}" x2="${Xp(r.x0 - r.lt)}" y1="${pz(c.depth/2)}" y2="${pz(c.depth/2)}" stroke="var(--accent)" stroke-dasharray="3 3"/><text x="${Xp(gx)}" y="${pz(c.depth/2) - 4}" text-anchor="middle" font-size="10" fill="var(--accent)">${lab}</text>`; }
+  });
+  c.sinks.forEach(k => { const x = sinkCenterX(k, c, mx), z = sinkZ(k, c); P += k.type === 'integrated' ? `<rect x="${Xp(x - k.w/2)}" y="${pz(z - k.d/2)}" width="${k.w*s}" height="${k.d*s}" rx="3" fill="none" stroke="var(--accent)" stroke-width="1" pointer-events="none"/>` : `<circle cx="${Xp(x)}" cy="${pz(z)}" r="${k.w/2*s}" fill="none" stroke="var(--accent)" stroke-width="1" pointer-events="none"/>`; });
+  // çakışmalar: ön görünüşte kırmızı alan, üstte yazı
+  const cl = posClashes(c, mx), wEl = el.querySelector('#pos-warn');
+  cl.forEach(k => F += `<rect x="${Xf(k.x0)}" y="${fy(k.y1)}" width="${(k.x1 - k.x0)*s}" height="${(k.y1 - k.y0)*s}" fill="var(--bad)" fill-opacity=".35" stroke="var(--bad)" stroke-width="1.5" pointer-events="none"/>`);
+  if (wEl){ const ms = [...new Set(cl.map(k => k.msg))]; wEl.style.display = ms.length ? '' : 'none'; wEl.innerHTML = ms.map(t => `⚠ ${esc(t)}`).join('<br>'); }
+  pE.innerHTML = `<svg>${P}<line class="ins" y1="4" y2="${ph - 4}" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" visibility="hidden"/></svg>`;
+  fE.innerHTML = `<svg>${F}<line class="ins" y1="4" y2="${fh - 4}" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" visibility="hidden"/></svg>`;
+  // sürükleme: iki görünüşte de aynı modül kayar, bırakılacak yer çizgiyle gösterilir
+  el.querySelectorAll('svg').forEach((svg, vi) => svg.addEventListener('pointerdown', e => {
+    const g = e.target.closest('.pm'); if (!g) return;
+    const m = cfg.modules.find(o => o.uid === g.dataset.uid), r0 = mx.map[m.uid], x0 = e.clientX, y0 = e.clientY; let dx = 0, dy = 0, mode = null;
+    svg.setPointerCapture(e.pointerId);
+    const gs = [...el.querySelectorAll(`.pm[data-uid="${m.uid}"]`)], b0 = m.bottom || 0;
+    const newBottom = () => clamp(Math.round((b0 - dy/s)/10)*10, 0, 1500); // ön görünüşte dikey sürükleme: boy dolabın alt kenarı yerden (10 mm adım)
+    const mv = ev => { dx = ev.clientX - x0; dy = ev.clientY - y0;
+      if (!mode){ if (Math.max(Math.abs(dx), Math.abs(dy)) < 4) return; mode = vi === 1 && isTall(m) && Math.abs(dy) > Math.abs(dx) ? 'v' : 'h'; }
+      gs.forEach(n => n.classList.add('drag'));
+      if (mode === 'v'){ const yy = (b0 - newBottom())*s; g.setAttribute('transform', `translate(0,${yy})`); const o = el.querySelector('#pos-bot-o'); if (o) o.textContent = `${newBottom()/10} cm`; return; }
+      gs.forEach(n => n.setAttribute('transform', `translate(${dx},0)`));
+      const t = posTarget(m, (r0.x0 + r0.x1)/2 + dx/s, cfg, mx);
+      el.querySelectorAll('.ins').forEach((ln, k) => { const xx = (k ? Xf : Xp)(t.xMark); ln.setAttribute('x1', xx); ln.setAttribute('x2', xx); ln.setAttribute('visibility', 'visible'); }); };
+    const up = ev => { svg.removeEventListener('pointermove', mv); svg.removeEventListener('pointerup', up); svg.removeEventListener('pointercancel', up);
+      if (ev.shiftKey || ev.ctrlKey || ev.metaKey) toggleSel(m.uid); else { ui.sel = m.uid; ui.selSet = new Set([m.uid]); } ui.rightTab = 'modul';
+      if (mode === 'v') m.bottom = newBottom();
+      else if (mode === 'h'){ const t = posTarget(m, (r0.x0 + r0.x1)/2 + dx/s, cfg, mx); t.others.splice(t.at, 0, m); cfg.modules = t.others; }
+      refresh({left:false}); };
+    svg.addEventListener('pointermove', mv); svg.addEventListener('pointerup', up); svg.addEventListener('pointercancel', up);
+  }));
+}
+window.addEventListener('resize', () => { if (ui.pos) renderPos(); });
 function openPriceDetail(){
   const p = priceOf();
   openDialog(`<div class="row sp"><h3>Fiyat dökümü</h3><button class="btn sm" data-close>Kapat</button></div>
@@ -3223,21 +3343,14 @@ document.addEventListener('click', e => {
     case 'clear-sel': ui.sel = null; ui.selSet = new Set(); refresh({left:false}); break;
     case 'move': {
       const d = +b.dataset.d, j = si + d; if (j < 0 || j >= cfg.modules.length) break;
-      if (isTall(sel) && !isTall(cfg.modules[j])){
-        // boy dolap tezgahlı modüllerin üzerinden atlayıp dizilimin öbür ucuna geçer
-        cfg.modules.splice(si, 1);
-        const cm = ctrMods(cfg), at = d < 0 ? cfg.modules.indexOf(cm[0]) : cfg.modules.indexOf(cm[cm.length - 1]) + 1;
-        cfg.modules.splice(at, 0, sel); refresh({left:false}); break;
-      }
-      if (!isTall(sel) && isTall(cfg.modules[j])) break; // tezgahlı modül boy dolabın dışına çıkamaz
-      [cfg.modules[si], cfg.modules[j]] = [cfg.modules[j], cfg.modules[si]]; refresh({left:false}); break;
+      [cfg.modules[si], cfg.modules[j]] = [cfg.modules[j], cfg.modules[si]]; refresh({left:false}); break; // her modül komşusuyla yer değiştirir (boy dolap da araya girebilir)
     }
     case 'dup': {
       const ms = cfg.modules.filter(m => ui.selSet.has(m.uid)); if (!ms.length) break;
       const last = Math.max(...ms.map(m => cfg.modules.indexOf(m)));
       const copies = ms.map(m => { const n = clone(m); n.uid = uid(); return n; });
       // kopyalar bitişik eklenir: kopyanın sol kapaması kalkar, son modülün dış (sağ) kapaması son kopyaya geçer
-      copies.forEach(n => { if (n.sides && n.sides.left) n.sides.left.on = false; });
+      copies.forEach(n => { if (n.sides && n.sides.left) n.sides.left.on = false; delete n.gapL; }); // kopya bitişik gelir (boşluk kopyalanmaz)
       const lastM = cfg.modules[last]; if (lastM.sides && lastM.sides.right && lastM.sides.right.on && ms.includes(lastM)) lastM.sides.right.on = false;
       cfg.modules.splice(last + 1, 0, ...copies); ui.selSet = new Set(copies.map(n => n.uid)); ui.sel = copies[copies.length - 1].uid;
       refresh({left:false}); if (copies.length > 1) toast(`${copies.length} modül kopyalandı`); break;
@@ -3296,6 +3409,7 @@ document.addEventListener('click', e => {
       refresh(); toast('Önceki tasarımınız geri yüklendi'); } break;
     case 'close-all': ui.openSet.clear(); renderStrip(); requestRender(); break;
     case 'toggle-dims': ui.dims = !ui.dims; buildScene(); renderStrip(); break;
+    case 'toggle-pos': ui.pos = !ui.pos; renderPos(); break; // modül konumu paneli (plan + ön görünüş)
     case 'cam-front': camFront(); break;
     case 'cam-top': camTop(); break;
     case 'cam-right': camSide(1); break;
