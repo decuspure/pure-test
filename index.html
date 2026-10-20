@@ -3199,16 +3199,19 @@ function renderPos(){
     <div class="pf">${sm ? `<b>M${si + 1} · ${TYPES[sm.type].short} · ${sm.width/10} cm</b>
       <button class="btn sm" data-act="move" data-d="-1" ${si === 0 ? 'disabled' : ''}>← Sola</button><button class="btn sm" data-act="move" data-d="1" ${si === c.modules.length - 1 ? 'disabled' : ''}>Sağa →</button>
       ${sm && si > 0 ? (() => { const g0 = tallNext(sm, c) ? TALL_GAP : 0; // boy dolap yanında en az 10 cm
-        return `<label style="display:flex;align-items:center;gap:6px;margin-left:6px">Soldaki boşluk <input type="range" id="pos-gap" min="${g0}" max="${g0 + GAP_MAX}" step="10" value="${g0 + (sm.gapL || 0)}" data-g0="${g0}" style="width:120px"><output id="pos-gap-o" style="font-family:var(--f-mono);color:var(--ink)">${(g0 + (sm.gapL || 0))/10} cm</output></label>`; })() : ''}
-      ${sm && isTall(sm) ? `<label style="display:flex;align-items:center;gap:6px;margin-left:6px">Yerden <input type="range" id="pos-bot" min="0" max="1500" step="10" value="${sm.bottom}" style="width:120px"><output id="pos-bot-o" style="font-family:var(--f-mono);color:var(--ink)">${sm.bottom/10} cm</output></label>` : ''}` : '<span>Modül seçili değil</span>'}
+        return `<label style="display:flex;align-items:center;gap:6px;margin-left:6px">Soldaki boşluk <input type="range" id="pos-gap" min="${g0}" max="${g0 + GAP_MAX}" step="10" value="${g0 + (sm.gapL || 0)}" data-g0="${g0}" style="width:120px"><input type="number" id="pos-gap-n" min="${g0/10}" max="${(g0 + GAP_MAX)/10}" step="1" value="${(g0 + (sm.gapL || 0))/10}" style="width:62px;font-family:var(--f-mono)"> cm</label>`; })() : ''}
+      ${sm && isTall(sm) ? `<label style="display:flex;align-items:center;gap:6px;margin-left:6px">Yerden <input type="range" id="pos-bot" min="0" max="1500" step="10" value="${sm.bottom}" style="width:120px"><input type="number" id="pos-bot-n" min="0" max="150" step="1" value="${sm.bottom/10}" style="width:62px;font-family:var(--f-mono)"> cm</label>` : ''}` : '<span>Modül seçili değil</span>'}
       <button class="btn sm" data-act="toggle-pos" style="margin-left:auto">Tamam</button></div>`;
-  const gi = el.querySelector('#pos-gap'), bi = el.querySelector('#pos-bot');
-  if (gi){ // sürüklerken çizim ve 3B canlı, bırakınca kaydedilir
-    gi.addEventListener('input', () => { const g0 = +gi.dataset.g0; sm.gapL = +gi.value - g0; el.querySelector('#pos-gap-o').textContent = `${+gi.value/10} cm`; buildScene(); drawPos(el); });
-    gi.addEventListener('change', () => refresh({left:false})); }
+  const gi = el.querySelector('#pos-gap'), bi = el.querySelector('#pos-bot'), gn = el.querySelector('#pos-gap-n'), bn = el.querySelector('#pos-bot-n');
+  if (gi){ // sürüklerken çizim ve 3B canlı, bırakınca kaydedilir; sayı kutusuna cm yazılır (Enter / kutudan çıkınca uygulanır)
+    const g0 = +gi.dataset.g0;
+    gi.addEventListener('input', () => { sm.gapL = +gi.value - g0; gn.value = +gi.value/10; buildScene(); drawPos(el); });
+    gi.addEventListener('change', () => refresh({left:false}));
+    gn.addEventListener('change', () => { const v = clamp(Math.round(+gn.value || 0), g0/10, (g0 + GAP_MAX)/10); sm.gapL = v*10 - g0; refresh({left:false}); }); }
   if (bi){ // boy dolabın alt kenarı yerden
-    bi.addEventListener('input', () => { sm.bottom = +bi.value; el.querySelector('#pos-bot-o').textContent = `${sm.bottom/10} cm`; buildScene(); drawPos(el); });
-    bi.addEventListener('change', () => refresh({left:false})); }
+    bi.addEventListener('input', () => { sm.bottom = +bi.value; bn.value = sm.bottom/10; buildScene(); drawPos(el); });
+    bi.addEventListener('change', () => refresh({left:false}));
+    bn.addEventListener('change', () => { sm.bottom = clamp(Math.round(+bn.value || 0), 0, 150)*10; refresh({left:false}); }); }
   drawPos(el);
 }
 function drawPos(el){
@@ -3252,7 +3255,7 @@ function drawPos(el){
     const mv = ev => { dx = ev.clientX - x0; dy = ev.clientY - y0;
       if (!mode){ if (Math.max(Math.abs(dx), Math.abs(dy)) < 4) return; mode = vi === 1 && isTall(m) && Math.abs(dy) > Math.abs(dx) ? 'v' : 'h'; }
       gs.forEach(n => n.classList.add('drag'));
-      if (mode === 'v'){ const yy = (b0 - newBottom())*s; g.setAttribute('transform', `translate(0,${yy})`); const o = el.querySelector('#pos-bot-o'); if (o) o.textContent = `${newBottom()/10} cm`; return; }
+      if (mode === 'v'){ const yy = (b0 - newBottom())*s; g.setAttribute('transform', `translate(0,${yy})`); const o = el.querySelector('#pos-bot-n'); if (o) o.value = newBottom()/10; return; }
       gs.forEach(n => n.setAttribute('transform', `translate(${dx},0)`));
       const t = posTarget(m, (r0.x0 + r0.x1)/2 + dx/s, cfg, mx);
       el.querySelectorAll('.ins').forEach((ln, k) => { const xx = (k ? Xf : Xp)(t.xMark); ln.setAttribute('x1', xx); ln.setAttribute('x2', xx); ln.setAttribute('visibility', 'visible'); }); };
