@@ -2508,7 +2508,7 @@ let badoTex = null;
 const badoLabelTex = () => badoTex || (badoTex = (() => {
   const cv = document.createElement('canvas'), W = 640, H = 200, g = cv.getContext('2d'); cv.width = W; cv.height = H;
   g.fillStyle = '#0b0b0b'; g.fillRect(0, 0, W, H);
-  const k = Math.min((W - 120)/1709, (H - 50)/635), ox = (W - 1709*k)/2 - 170*k, oy = (H - 635*k)/2 - 365*k, X = v => ox + v*k, Y = v => oy + v*k;
+  const k = Math.min((W - 70)/1709, (H - 36)/635), ox = (W - 1709*k)/2 - 170*k, oy = (H - 635*k)/2 - 365*k, X = v => ox + v*k, Y = v => oy + v*k;
   g.strokeStyle = g.fillStyle = '#ffffff'; g.lineWidth = 48*k;
   [365, 805, 1244, 1684].forEach(cx => { g.beginPath(); g.arc(X(cx), Y(805), 171*k, 0, Math.PI*2); g.stroke(); });
   g.fillStyle = '#ffffff'; [[170, 365, 440], [951, 805, 195], [1390, 365, 440]].forEach(([x, y, h]) => g.fillRect(X(x), Y(y), 48*k, h*k));
@@ -2559,7 +2559,7 @@ function drawerBox(dg, b){
   });
   // marka etiketi (Legrabox'taki blum etiketinin yeri): yanların DIŞ yüzünde, öne yakın ALT kısımda, siyah zeminli beyaz bado etiketi (kullanıcı 2026-10-21)
   const lm = std('badoLabel', () => new THREE.MeshStandardMaterial({map: badoLabelTex(), roughness:.45, metalness:.1, polygonOffset:true, polygonOffsetFactor:-2}));
-  const lw = Math.min(36, d*.1), lh = lw*200/640;
+  const lw = Math.min(60, d*.15), lh = lw*200/640; // 60 mm (kullanıcı 2026-10-21: 36 mm okunmuyordu)
   [[x0 - .3, -Math.PI/2], [x1 + .3, Math.PI/2]].forEach(([lx, ry]) => {
     const lg = new THREE.Mesh(new THREE.PlaneGeometry(lw, lh), lm); lg.rotation.y = ry; lg.position.set(lx, yb + 12 + lh/2, z1 - 14 - lw/2); lg.raycast = () => {}; dg.add(lg);
   });
