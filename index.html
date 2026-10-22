@@ -363,7 +363,7 @@ dialog::backdrop{background:rgba(10,14,13,.45)}
 const TOP_STD = 900; // tezgah üstü 90 cm (yere basan / bazalı modül yoksa her zaman)
 let TOTAL_H = TOP_STD;
 const PLINTH = 100, DEPTH_MIN = 500, DEPTH_MAX = 500; // derinlik 50 cm sabit
-const TOP_T = [6,12,20,25,30,40,60,80,100,120];
+const TOP_T = [6,30,80,120]; // tezgah kalınlıkları (kullanıcı 2026-10-22; 12 mm kaldırıldı)
 const W_MIN = 300, W_MAX = 1200, W_STEP = 50; // tezgah altı modül genişliği mm (C1, C2, C3 hepsi 30–120 cm; kullanıcı kararı), 5 cm adım
 const wMax = m => (TYPES[m.type] && TYPES[m.type].Wmax) || W_MAX; // tipe göre üst sınır (boy dolaplar kendi Wmax'ı; tezgah altı W_MAX)
 /* modül grupları: C1/C2/C3 çekmece sayısına göre, B1 boy */
@@ -387,6 +387,12 @@ const TYPES = {
   b1w:{cat:'b1', label:'B1 - Çamaşır', short:'B1-Ç', H:1500, Hmin:1250, Hmax:1800, Hopts:[1250, 1300, 1400, 1500, 1600, 1700, 1800], W:450, Wmin:300, Wmax:600, Wopts:[300, 400, 450, 600], D:565, tall:true, wash:true} // ÇAMAŞIR SEPETLİ BOY DOLAP (2026-10-09): altta Vauth-Sagel ENVI Space XX Pro raylı çamaşır sepeti (çekmece kapak), arada gola, üstte raflı menteşeli kapak; derinlik 56,5 SABİT (arkalık 25 mm içeride; kullanıcı kararı)
 };
 const isTall = m => !!(TYPES[m.type] && TYPES[m.type].tall);
+/* BOY DOLAP DERİNLİĞİ AYARLI (kullanıcı 2026-10-22): mekanizmasız boy dolaplarda (B1 tek / iki kapak, B2 golalı / elcikli) 20–60 cm, 5 cm adım (m.depth, mm);
+   kiler (VS TAL Gate) ve çamaşır (ENVI) sabit. modD: modülün dış derinliği (kapak dahil); üst modülde ve tezgah altında tipin ya da dizilimin derinliği */
+const TALL_DMIN = 200, TALL_DMAX = 600, TALL_DSTEP = 50;
+const IDR_MIN_D = 350; // iç çekmece (LEGRABOX NL 300) en az 35 cm derinlikte sığar (gövde içi cd − 25 − 2 ≥ 300)
+const tallDepthAdj = m => isTall(m) && !TYPES[m.type].pantry && !TYPES[m.type].wash;
+const modD = m => tallDepthAdj(m) && m.depth ? m.depth : TYPES[m.type].D;
 const isUpper = m => !!(m && TYPES[m.type] && TYPES[m.type].upper); // U1 / U2 üst modül
 const UPPER_GOLA = 26; // üst modülde gola: gövde altındaki profil yüksekliği (kapak bunu örter, parmak kapağın alt kenarından girer)
 const UPPER_UP = 500; // ilk konulduğunda alt kenarı tezgah üstünden 50 cm yukarıda
@@ -500,7 +506,7 @@ const IDR_MAX = 3, IDR_NL = 300, IDR_GAP = 50;
    M: kapalı metal iç ön panel 98 mm, dolapta 109 mm yer; C: yüksek metal iç ön panel 185 mm + yanlarda üstte GALERİ RAYI (önden arkaya), dolapta 191 mm yer */
 // ön panel yüksekliği Blum'daki 98 / 185 değil: kullanıcı isteğiyle yan / galeri rayıyla SIFIR (tallInterior); space Blum'un dolapta istediği yer
 const IDR = {M: {space: 109, gallery: false}, C: {space: 191, gallery: true}};
-const tallIdrOK = m => isTall(m) && !tallGolaOnly(m) && !tallPantry(m); // kilerde iç çekmece yok (VS TAL Gate)
+const tallIdrOK = m => isTall(m) && !tallGolaOnly(m) && !tallPantry(m) && modD(m) >= IDR_MIN_D; // kilerde iç çekmece yok (VS TAL Gate); 35 cm'den sığ dolapta sığmaz
 const tallIdr = m => tallIdrOK(m) && Array.isArray(m.idr) ? m.idr : [];
 // İÇ ÇEKMECELİ KAPAKTA BLUM 155° SIFIR TAŞMALI MENTEŞE (kullanıcı 2026-10-20 "robot menteşe"; CLIP top BLUMOTION 71B7550): kapak dolap ağzına girmez, çekmeceler kapağa çarpmaz
 const hinge155 = m => tallIdr(m).length > 0;
@@ -642,7 +648,7 @@ const TOPS = [
 ];
 const TOP_THUMB = {viola:'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAcFBQYFBAcGBgYIBwcICxILCwoKCxYPEA0SGhYbGhkWGRgcICgiHB4mHhgZIzAkJiorLS4tGyIyNTEsNSgsLSz/2wBDAQcICAsJCxULCxUsHRkdLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCz/wAARCABwADADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD2YXAvNOt7mN1WXySy4bhQw+ZvfGP1rkFlbU7fTlErRtqLoWhGd0KNuZgM9OSozxx06UzUluYJ5bLT0ktIIw8VrCW2siy7Rgk5G3qcds+1Zvh+9utPktbK++WVQESV+eVBwM+uT09BXObpHdarrcKw/wBnWUsa3M4it9iuAUD+nvtzj6Vi6ZI+leL7izvTFJMYlijmYne8YwVwO5Izn0Kk9DWJ4fktrUNdXTQpPHI29n/eMypICMf3WA3EHvnFdLpV1a6v4sa9tYI3861dGnaP5mJYbecdAu4H6CmKw+a4stR1h7a6kW5a2dJnQD5WDEjBH+yw/UUaxOy+I/PhgBEUAVJDGPLU4JLO3XAGBjp19KkTRbHw9qVxdwoApiRZpHkLSNjPJz+JP09qzPFZlXTLy2e2jFvdSpDFcLITuDAFgQB8p6AdjmjUNDo4LWe0LXnlLd3EoJfe2Ng7YH4U230LTrnSik8QlW5bzWZuoY9Cvpj2qWOZkXl2bZgbm/ixUmnui2HlxsCsBKMOpXFCViXc5C7ji8IahdXCxiextI/mLgNKWmxwT3GUz7bvet7wkttaC0jjmEq3Fp9rViArHcctx9f51yd1peo+LLbVomnktwJPtXklc7vkIVeeoyq47DB71n/Z9b0Z9I1Cxka7t7m1aJFIZn2+V86lumQwJA69Tzg0yrHe/wDCQWt7DKxbYHYmMnA3BTz19weDXCalqWo6LdxWLTy2sRzKqQ5AaJnJIOf4geMds9arQ/adO0yy1O1aV7ZZ/s0phAZ42UkMNvrgKcj0NX7HfeO2rXrOdPjihhcu3mPImV3AA9ctjOPU0ID0VLbbbqoyRjucmudnhvY7252sgVi5kQlhnDAgAjgttzjPbOK6uWVIrZ5NwCopycZA9K5PXpBrr2wsJA0kqvFJCynDEdGHI6EHkdATSa1JTK2i3txZWst/5wvWvYxHBGziFY23HK5/DP0XmtTTrbPwpuVuHSQRQSSoUkzswNy/N2INcXPizR7TU7WYpYuxiBbgSHDNGccHAzg46VteD/EdnZaZNaajPBFA7G5kWQ4JTaBgjHIJ9M52mmNmrpWgR6Lq2lpJdgy3CtvQgKHcKSdo64AJH0FZeptZWMtlZRxxsPLF1aEsQYtzgksTwQQOnv7Vjanrl1rVnbW0MhcwXMMCzqDEYEkJVc55L4OCRxxmtkadKNR0OOQki20/y5N+1gXjLrg5wSfT9aAZuXU0N/YS2lvNOm1VLBV5YkjCgHrxyQPauXXT9V0m++0x2sFs00RCuwYyR4yd+SevAB6YyKn8J2sdlNb3ttcvPZ28TvM8jAoCGYEqffOfyq349vLuO6s2jjPlMGSLYSdzdckD04I96SAn0i/iGs/brrVVMN5C7KrYVDIpVWJ9W2qP1rN1i20qbVr2Kw0CWd5bLzligQBZ16bgB93I45xnAqLR9VttM8A6rHeRbp7fcYY5owdrOgAAz6k5/Ous8CzWwgez85LiWGONluAu0yxkHAx22nIx7g96dgvbU83mP2fwlcwzWd/Dq0U8cxQ2zBSxJBXPQhVJGfXFasJvNPa5vrm2vYFvEUqLqDf+94br0Xdg/ia9cZVL7R90dqx/E1t5ujTlQPlRmb5NxIAPQevXHviqsSpXPJZr+K40bVI7aWSCOMiNoI2VNpbbksAecqCM9jXcWOpwap4GsL2SRVeLb5bvwTIp2/mQK4RLTVrfw7LqlxYx/wBn6iPLyqAsMkENz8wUkEjtz9K6nwjbf2j4UtbRNu0T+YUxzjBIB9MkVJcu5Q8V+FLhLEeJFedJ5Jsz25wQkW4lQBjk8/rWX4W8WPpWrske7ddKki7/AJlfk5H+zxux+Feu3E9tdaI0rhXglTaynpzwV+ueK4zxB8P7KGQ6rb20UsFtEWmtnJ+ZRydpHIIwT1H1pk37nb6fqUeoWkdxHwJBnaTyD3FR6nqdvaQusj7pQM+WvzN7HA5rx7UI54Lx9P05I5II0F7HLL87rDw2whjj5QTjGSQeeprpNN1MAWdxp9sRCJwlxcTOSz4O4jbn5eMHPTgjtRcOUsfEnWHsPDyWEKlhcOmUQYPlr1A9OcCsjw3cXdlcxv8AaGUpHFc+XJgLLgAFM9jknHuKua0L698SXqQB5IbT7OqReXvBbJOSew2u1Ypmv7q202yunb7ZbSiOCYABkL/KQD3Gdp9RmkUtrFbSfFDweKLOK8vZGtL+9FxNGVGyJtzdznjJXkYr13X7hU0Sa25Ml4PIXHbI5Y+wGSa8D1PQNRt7vUJ78DNvcSeYyZwshIxwMD5sZHbA56iulsINYvYPD8E73nkuWiVJDuHlHALdMjJAxnOQTimJo010ae+1tIbmNGlvIZQlyxZCQpGFbPQDByF7HtWlpegpHd3f2QEyvB5ckoY7Vfk4BPOMNg9yCK6TxTLFBorI7FXmkSFCoO9stkhSOQSAelYUWpm01NhH9tubUoIWl2b90ioDgtkFTndnIA4pBcz7O3u7LWZ1Mc0FnqNwyFbhjvYqjFSCf7ynHJwSOtdlb6DbSana3CDakbGcKOAG9fyNZWjWjwWlvZT3Ec9obUJ5JQ5jbOThj26cHkEZpuh6jZ6Fq97pn2uW4u5pEdVZcsu89SR2HUk+tK9xieK7W0uXudKljGNTukYOrBdjICWY/gP51R04xWni63tLx4mhgJtbdw43oYsEbvTKn8fwqw+lWOs67q9vcyrcPbSlhEknKKIwQTzwSxYGsK4Ec3iGwjtVhLmTMqRDeuHjyDv7hsOfbpRcEjstcurG41/SYpXVlgaS5zu+UMq/Lkg9eScGuV1XxFYQwTWkd0nlRmRZZzHuLgnITA7Y3ZPofesrULe60q4WWzQTwSTAeUF3BS7EAY9Ox961LzQraPRZLKOe5DIjpOr7BljgsWPUkAKPoSaNwtY//9k=',picasso:'data:image/jpeg;base64,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',titanium:'data:image/jpeg;base64,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',crosscut:'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAcFBQYFBAcGBgYIBwcICxILCwoKCxYPEA0SGhYbGhkWGRgcICgiHB4mHhgZIzAkJiorLS4tGyIyNTEsNSgsLSz/2wBDAQcICAsJCxULCxUsHRkdLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCz/wAARCABwADADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD1qk96BS9ayKA0DmijjNAAKUDvSd6XJoATFFAxRQAEUCkJ5pe1AB2o6ikzTh1oAQCilpKAENHaloxTASjNHvQelADgaQdaTvRQAvUUCkpe9IBKKMUUwFzxSZzRRQAUooxRigA60mcUtJSAM0tJS0AL/KkPtR3pM80ALRSUooADSjHpSAilzxQAho4pCKKAFNCnHaikzTA//9k=',forge:'data:image/jpeg;base64,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',macchia:'data:image/jpeg;base64,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'};
 
-const TOP_SURF = {mat:{label:'Mat', r:.55}, parlak:{label:'Parlak', r:.08}, soft:{label:'Soft-touch', r:.8}, yapili:{label:'Strüktürel', r:.72}};
+const TOP_SURF = {mat:{label:'Mat', r:.55}}; // yüzey seçimi kaldırıldı (kullanıcı 2026-10-22): tezgah hep mat (3B pürüzlülüğü buradan)
 const HANDLES = {kanal:'Gola (J / C profil)', push:'Push-open', kulp:'Çubuk kulp'};
 const HANDLE_COLORS = {
   krom:{label:'Krom', hex:'#e8eaec', metal:1, rough:.12},
@@ -747,7 +753,7 @@ const PRICE = {
   ucut:0 /* U kesim işçiliği fiyata girmez (kullanıcı) */, plinth:2 /* ayarlı baza ayağı, ADET (modül başına 4) */,
   // Blum LEGRABOX pure BLUMOTION Carbon black, takım satış € (boy + NL): çekmece (tezgah altı) ve iç çekmece (Gizli Çekmece, boy dolap iç çekmecesi)
   lgb:{M450:264.44, C450:341.08}, lgbInner:{M450:347.68, M300:342.8, C300:419.84},
-  topM2:{6:85,12:110,20:155,25:180,30:210,40:270,60:340,80:420,100:500,120:580},
+  topM2:{6:85,30:210,80:420,120:580},
   sink:{vessel_round:0 /* çanak lavabo fiyata girmez (kullanıcı 2026-10-13) */, integrated:195}, drain:{gizli:50, rampa:44, zarf:68}, faucetHole:0 /* batarya fiyata girmez (kullanıcı 2026-10-13) */,
   mirrorM2:76, glassM2:45 /* camlı kapak camı 4 mm temperli, ÖRNEK */, mirrorBase:18, mirrorShape:{organik:1.4}, led:52, vat:.20,
   bandM:{kaplama:1, lam:0.478}, // kenar bandı satış €/m (bant enine göre fark yok); lake kenarları boyalı, bant yok
@@ -773,7 +779,7 @@ function defaultConfig(){
   const a = uid(), b = uid(), c = uid();
   return {
     depth:500,
-    top:{t:20, color:'picasso', surf:'mat'},
+    top:{t:6, color:'picasso', surf:'mat'},
     body:{mat:'lam', color:'dcsgb'},
     front:{mat:'kaplama', color:'vernikli', fin:'mat', style:'duz', stripDir:'dikey'},
     handle:'kanal', handleColor:'krom', kanalFin:'alu',
@@ -885,7 +891,7 @@ const PABUC = 5;
 function sideGeom(c, m, k, mx){
   const r = mx.map[m.uid], t = msT(m, k), d = moduleDims(m, c), floor = !!(m.sides[k].full || onBase(m));
   return {t, floor, x0: k === 'left' ? r.x0 - t : r.x1, y0: floor ? PABUC : d.bottomY,
-    y1: isTall(m) ? d.topY : topH(c) - topT(c), depth: (isTall(m) ? TYPES[m.type].D : c.depth) + (tallElcik(m) ? 0 : sideFrontExtra(c))}; // elcikli modül düz kapaklı: kapama çıta payı almaz
+    y1: isTall(m) ? d.topY : topH(c) - topT(c), depth: (isTall(m) ? modD(m) : c.depth) + (tallElcik(m) ? 0 : sideFrontExtra(c))}; // elcikli modül düz kapaklı: kapama çıta payı almaz
 }
 function sidesText(c){
   const p = []; (c.modules || []).forEach((m, i) => ['left', 'right'].forEach(k => { const t = msT(m, k); if (t) p.push(`M${i+1} ${k === 'left' ? 'sol' : 'sağ'} ${t} mm${m.sides[k].full ? ' (yere kadar)' : ''}`); }));
@@ -947,8 +953,8 @@ function normalize(c = cfg){
   // eksik / eski kayıtlarda ana alanlar (sipariş görünümü ve fiyat bunlara güvenir)
   c.top = c.top || {}; c.body = c.body || {mat:'lam'}; c.front = c.front || {mat:'lam'};
   c.modules = c.modules || []; c.sinks = c.sinks || []; c.mirrors = c.mirrors || [];
-  if (!TOP_T.includes(c.top.t)) c.top.t = 20;
-  if (!TOP_SURF[c.top.surf]) c.top.surf = Object.keys(TOP_SURF)[0];
+  if (!TOP_T.includes(c.top.t)) c.top.t = TOP_T.reduce((a, b) => Math.abs(b - (+c.top.t || 6)) < Math.abs(a - (+c.top.t || 6)) ? b : a); // listede olmayan (eski 12 / 20 / 25 / 40 / 60 / 100) en yakına
+  c.top.surf = 'mat'; // yüzey seçimi yok (kullanıcı 2026-10-22); eski parlak / soft / strüktürel kayıtlar mat
   if (!TOPS.some(t => t.id === c.top.color)) c.top.color = TOPS[0].id;
   if (!MATS[c.body.mat]) c.body.mat = 'lam'; if (!MATS[c.front.mat]) c.front.mat = 'lam';
   if (!LAKE_FIN[c.front.fin]) c.front.fin = 'mat';
@@ -1002,6 +1008,7 @@ function normalize(c = cfg){
       if (tallElcik(m)){ m.handle = 'elcik'; if (m.elcikSide !== 'L' && m.elcikSide !== 'R') m.elcikSide = 'L'; } // B2 elcikli: tek tip elcik, tek kapakta (sol/sağ)
       if (layoutOf(m).hMin) m.height = Math.max(m.height, layoutOf(m).hMin); // elcikli B2 120 cm'den başlar
       if (m.hinge !== 'L' && m.hinge !== 'R') m.hinge = 'R';
+      if (tallDepthAdj(m)) m.depth = clamp(Math.round((+m.depth || TYPES[m.type].D)/TALL_DSTEP)*TALL_DSTEP, TALL_DMIN, TALL_DMAX); else delete m.depth; // mekanizmasız boy dolapta derinlik 20–60 cm
       // iç çekmeceler (golalıda saklanır ama çizilmez); boylar SABİT, alttan: 1 → C, 2 → C M, 3 → C C M
       m.idr = idrSizes(Math.min(IDR_MAX, Array.isArray(m.idr) ? m.idr.length : 0));
       m.bottom = clamp(Math.round((m.bottom != null ? +m.bottom : TALL_BOTTOM)/10)*10, 0, 1500);
@@ -1223,7 +1230,7 @@ function cutList(c = cfg){
       return;
     }
     if (isTall(m) && tallElcik(m)){ // B2 elcikli: TEK gövde, yan yana iki kapak (sol/sağ menteşe, arası 3 mm), elcik yalnız bir kapakta (m.elcikSide)
-      const Dt = TYPES[m.type].D, cdt = Dt - fT, nSh = tallIdrParts(m, mod, W, cdt), dH = H - 3, DW = (doorFit(m).dw - 3)/2;
+      const Dt = modD(m), cdt = Dt - fT, nSh = tallIdrParts(m, mod, W, cdt), dH = H - 3, DW = (doorFit(m).dw - 3)/2;
       push('Yan dikme', mod, 2, H, cdt, T, bName, bKey, 'Boy dolap (elcikli, tek gövde)' + bGrainV);
       push('Alt tabla', mod, 1, W - 2*T, cdt, T, bName, bKey);
       push('Üst tabla', mod, 1, W - 2*T, cdt - TALL_BACK_IN, T, bName, bKey, 'Arkalığın önünde biter (arkalık yukarıdan kanala sürülür)');
@@ -1244,7 +1251,7 @@ function cutList(c = cfg){
       return;
     }
     if (isTall(m) && tallPair(m)){ // B2 çift kapaklı boy dolap: iki ayrı gövde (W/2), ayarlı raflar, yan yana iki kapak (sol/sağ menteşe), ortada dikey gola C profil (hep gola)
-      const th = tallHandleOf(m, c), Dt = TYPES[m.type].D, cdt = Dt - fT, nSh = pairShelves(H), gola = th === 'kanal', bw2 = W/2;
+      const th = tallHandleOf(m, c), Dt = modD(m), cdt = Dt - fT, nSh = pairShelves(H), gola = th === 'kanal', bw2 = W/2;
       const dH = H - 3, DW = (doorFit(m).dw - (gola ? J_GAP : 3))/2; // iki kapak arası 3 mm, gola ise 30 mm
       const gk = gola ? ` · ön kenar gola kertiği ${GOLA_D} mm` : '';
       push('Yan dikme (dış)', mod, 2, H, cdt, T, bName, bKey, `Boy dolap · 2 gövde × ${bw2} mm` + bGrainV);
@@ -1266,7 +1273,7 @@ function cutList(c = cfg){
       return;
     }
     if (isTall(m)){ // B1 boy dolap: gövde, raflar, iki kapak, menteşe, askı, kulp/gola
-      const one = tallOne(m), th = tallHandleOf(m, c), Dt = TYPES[m.type].D, cdt = Dt - fT, gola = th === 'kanal', gap = gola ? 15 : 1.5, split = tallSplit(m, H);
+      const one = tallOne(m), th = tallHandleOf(m, c), Dt = modD(m), cdt = Dt - fT, gola = th === 'kanal', gap = gola ? 15 : 1.5, split = tallSplit(m, H);
       const dLo = split - gap - 1.5, dUp = H - split - gap - 1.5, dOne = H - 3, side = m.hinge === 'L' ? 'sol' : 'sağ';
       push('Yan dikme', mod, 2, H, cdt, T, bName, bKey, (tallPantry(m) ? 'Kiler boy dolap · VS TAL Gate ray bağlantısı' : gola ? `Gola kertiği ${GOLA_D} mm · alttan ${split} mm` : 'Boy dolap') + bGrainV);
       push('Alt tabla', mod, 1, W - 2*T, cdt, T, bName, bKey);
@@ -1375,7 +1382,7 @@ function cutList(c = cfg){
   if (c.modules.length){
     const tr = topRuns(c, mx), nm = k => tr.length > 1 ? ` (${tr[k].mods.map(m => 'M' + (c.modules.indexOf(m) + 1)).join(' · ')})` : '';
     tr.forEach((r, k) => {
-      tops.push({part:'Porselen tezgah' + nm(k), L:r.L, W:topD(c), t:c.top.t, mat:`${topById(c.top.color).name} · ${TOP_SURF[c.top.surf].label}`});
+      tops.push({part:'Porselen tezgah' + nm(k), L:r.L, W:topD(c), t:c.top.t, mat:`${topById(c.top.color).name}`});
       if (c.top.t > 12) tops.push({part:'Ön düşey bant (45° birleşim)' + nm(k), L:r.L, W:c.top.t, t:12, mat:'Aynı seri'}); });
   }
   const sinksOut = c.sinks.map(s => ({s, label:SINKS[s.type].label + (s.type === 'integrated' ? ' · ' + DRAINS[s.drain] : ''), dims: s.type === 'integrated' ? `${s.w}×${s.d} · ${s.depth} mm` : vesselName(s)}));
@@ -1426,7 +1433,7 @@ function priceOf(c = cfg){
   });
   const hwSum = cl.hw.filter(h => h.kind !== 'org').reduce((s,h) => s + h.qty*h.price, 0);
   const mx = moduleX(c);
-  const top = topRuns(c, mx).reduce((a, r) => a + r.L, 0)*topD(c)/1e6 * PRICE.topM2[c.top.t] * (c.top.surf === 'parlak' ? 1.08 : 1); // yalnız tezgahlı modüllerin üstü
+  const top = topRuns(c, mx).reduce((a, r) => a + r.L, 0)*topD(c)/1e6 * PRICE.topM2[c.top.t]; // yalnız tezgahlı modüllerin üstü
   const band = Object.values(cl.bands).reduce((s, b) => s + b.m*(PRICE.bandM[b.mat] || 0), 0);
   const bandLab = Object.values(cl.bands).reduce((s, b) => s + b.m, 0)*PRICE.bandLabor;
   const sinks = c.sinks.reduce((s,k) => s + PRICE.sink[k.type] + (k.type === 'integrated' ? PRICE.drain[k.drain] : 0) + (k.faucet === 'delikli' ? PRICE.faucetHole : 0), 0);
@@ -1547,7 +1554,7 @@ function topMat(double){
   const t = topById(cfg.top.color), s = cfg.top.surf;
   return std(`t_${t.id}_${s}_${double ? 'd' : ''}`, () => {
     // tezgah pozlaması: doku %18 karartılır, yansıma azaltılır
-    const m = new THREE.MeshStandardMaterial({map: stoneTex(t), color: srgb(TOP_EXPOSURE), roughness: Math.min(.95, TOP_SURF[s].r + .12), metalness:0, envMapIntensity: s === 'parlak' ? .5 : .22, side: double ? THREE.DoubleSide : THREE.FrontSide});
+    const m = new THREE.MeshStandardMaterial({map: stoneTex(t), color: srgb(TOP_EXPOSURE), roughness: Math.min(.95, TOP_SURF[s].r + .12), metalness:0, envMapIntensity: .22, side: double ? THREE.DoubleSide : THREE.FrontSide});
     m.userData.tile = TOP_TILE; return m;
   });
 }
@@ -2275,7 +2282,7 @@ function buildHinge(g, dg, {xi, si, sgn, hy, cd, fT, T, gap, px, z155}){
   }));
 }
 function buildTall(m, x0, idx, mx){
-  const c = cfg, D = TYPES[m.type].D, T = matT(c.body.mat), fT = matT(c.front.mat), cd = D - fT;
+  const c = cfg, D = modD(m), T = matT(c.body.mat), fT = matT(c.front.mat), cd = D - fT;
   const {H, bottomY} = moduleDims(m), W = m.width, cx = x0 + W/2, top = bottomY + H;
   const g = new THREE.Group(); g.userData.mod = m.uid; root.add(g);
   const bm = panelMat(c.body.mat, c.body.color), fm = panelMat(c.front.mat, c.front.color, c.front.fin);
@@ -2439,7 +2446,7 @@ function buildTall(m, x0, idx, mx){
    Ayarlı raflar eşit aralıklı; Blum 107° menteşe (gerçek dört çubuklu hareket); U1 tek kapak (sol / sağ menteşe), U2 iki kapak (sol soldan, sağ sağdan); aynalı kapakta önde 4 mm ayna */
 const upperShelves = (m, c = cfg) => { const T = matT(c.body.mat), {H} = moduleDims(m, c), a = m.handle === 'kanal' ? Math.max(T, UPPER_GOLA) : T; return shelfYs(a, H - T, Math.max(1, shelfN(H - T - a)), T); }; // alttan (mm), 3B ve parça listesi ortak
 function buildUpper(m, x0){
-  const c = cfg, D = TYPES[m.type].D, T = matT(c.body.mat), fT = matT(c.front.mat), cd = D - fT, bt = backT(c.body.mat);
+  const c = cfg, D = modD(m), T = matT(c.body.mat), fT = matT(c.front.mat), cd = D - fT, bt = backT(c.body.mat);
   const {H, bottomY} = moduleDims(m), W = m.width, cx = x0 + W/2, top = bottomY + H;
   const g = new THREE.Group(); g.userData.mod = m.uid; root.add(g);
   const bm = panelMat(c.body.mat, c.body.color), fm = panelMat(c.front.mat, c.front.color, c.front.fin);
@@ -3085,7 +3092,7 @@ function buildDims(mx){
   });
   // boy dolap: genişlik (üstte), yükseklik ve yerden yüksekliği (dış yanında) dolabın önünde
   c.modules.filter(m => isTall(m) || isUpper(m)).forEach(m => { // üst modülde de aynı: genişlik üstte, yükseklik ve yerden yükseklik yanında
-    const r = mx.map[m.uid], d = moduleDims(m), zf = TYPES[m.type].D + 20, left = isUpper(m) ? (r.x0 + r.x1)/2 < (mx.run0 + mx.run1)/2 : r.x0 < mx.run0;
+    const r = mx.map[m.uid], d = moduleDims(m), zf = modD(m) + 20, left = isUpper(m) ? (r.x0 + r.x1)/2 < (mx.run0 + mx.run1)/2 : r.x0 < mx.run0;
     const yw = d.topY + 60; line([[r.x0, yw, zf], [r.x1, yw, zf]], g); [r.x0, r.x1].forEach(x => line([[x, d.topY + 10, zf], [x, yw + 30, zf]], g));
     const tw = textPlane(`${m.width/10}`, 58); tw.position.set((r.x0 + r.x1)/2, yw + 40, zf + 2); g.add(tw);
     const vx = left ? r.x0 - r.lt - 90 : r.x1 + r.rt + 90;
@@ -3282,8 +3289,6 @@ function renderLeft(){
     <section><h2 class="sec">Renk</h2>
       <div class="sw">${TOPS.map(t => `<button data-act="set" data-k="top.color" data-v="${t.id}" aria-pressed="${c.top.color === t.id}" title="${t.name}" style="${topSwatch(t)}"></button>`).join('')}</div>
       <div class="swname">${topById(c.top.color).name}</div></section>
-    <section><h2 class="sec">Yüzey</h2>
-      <div class="seg">${Object.entries(TOP_SURF).map(([k, v]) => `<button data-act="set" data-k="top.surf" data-v="${k}" aria-pressed="${c.top.surf === k}">${v.label}</button>`).join('')}</div></section>
     <p class="hint" style="margin:0">Porselen tezgah tezgahlı modüllerin üstünde tek parça. Kalınlık değişince askı modüller aşağı iner; tezgah üstü 90 cm (çanak lavabo tezgahın üstüne oturur). C3 (bazalı) modül varsa tezgah onun üstüne oturur. Boy dolap tezgahın yanında durur.</p></div>`;
   }
   const pb = L_.querySelector('.pbody'), st = pb && L_.dataset.tab === tab ? pb.scrollTop : 0; // aynı sekmede kaydırma korunur
@@ -3392,13 +3397,16 @@ function renderRight(){
     }
     else if (isTall(m)){
       const {H, bottomY} = moduleDims(m), Tt = TYPES[m.type];
-      body = `<div class="row sp"><h3 class="ttl">M${i+1} · ${Tt.label}</h3><span class="tag">${m.width/10}×${H/10}×${String(Tt.D/10).replace(".", ",")}</span></div>
+      body = `<div class="row sp"><h3 class="ttl">M${i+1} · ${Tt.label}</h3><span class="tag">${m.width/10}×${H/10}×${String(modD(m)/10).replace(".", ",")}</span></div>
       <p class="hint" style="margin:-8px 0 0">${tallPair(m) ? (tallElcik(m) ? 'Elcikli, ' + (m.elcikSide === 'R' ? 'sağ' : 'sol') + ' kapakta elcik' : 'İki gövde, ortada dikey gola') : tallWash(m) ? 'Altta çamaşır sepeti, üstte raflı kapak' : tallPantry(m) ? 'VS TAL Gate kiler, ' + TYPES[m.type].trays + ' sepet' : tallOne(m) ? 'Tek kapak' : 'İki kapak' + (m.handle === 'kanal' ? ', arada gola' : '')}</p>
       <div>
       <div class="field"><label for="m-type">Modül</label><select id="m-type" data-m="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${m.type === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></div>
       ${Tt.Wopts ? `<div class="lbl" style="margin-bottom:6px">Genişlik</div><div class="seg" style="margin-bottom:10px">${Tt.Wopts.map(v => `<button data-act="mset" data-k="width" data-v="${v}" aria-pressed="${m.width === v}">${v/10} cm</button>`).join('')}</div>`
         + (Tt.wash ? `<p class="hint" style="margin:-4px 0 10px">Derinlik ${String(Tt.D/10).replace(".", ",")} cm (sabit) · Vauth-Sagel ENVI Space XX Pro ${WASH[washModel(m.width)].name.replace('RAYLI ÇAMAŞIR SEPETİ ', '').toLowerCase()} (${WASH[washModel(m.width)].code})${m.width > washModel(m.width) + 20 ? ` · iki yanda ${(m.width - washModel(m.width))/2} mm dolgu` : ''}</p>` : '')
-        : Tt.Wmin === Tt.Wmax ? `<p class="hint" style="margin:0 0 10px">Genişlik ${Tt.W/10} cm · derinlik ${String(Tt.D/10).replace(".", ",")} cm${Tt.Hmin === Tt.Hmax ? ` · yükseklik ${Tt.H/10} cm` : ''} (sabit)${Tt.pantry ? ` · Vauth-Sagel VS TAL Gate ${Tt.tg.set}, ${Tt.trays} Planero sepet` : ''}</p>` : wField('m-width', 'm', m.width, Tt.Wmin, Tt.Wmax, Tt.Wstep || W_STEP) + `<p class="hint" style="margin:-6px 0 10px">Derinlik sabit ${String(Tt.D/10).replace('.', ',')} cm</p>`}
+        : Tt.Wmin === Tt.Wmax ? `<p class="hint" style="margin:0 0 10px">Genişlik ${Tt.W/10} cm · derinlik ${String(Tt.D/10).replace(".", ",")} cm${Tt.Hmin === Tt.Hmax ? ` · yükseklik ${Tt.H/10} cm` : ''} (sabit)${Tt.pantry ? ` · Vauth-Sagel VS TAL Gate ${Tt.tg.set}, ${Tt.trays} Planero sepet` : ''}</p>` : wField('m-width', 'm', m.width, Tt.Wmin, Tt.Wmax, Tt.Wstep || W_STEP) + (tallDepthAdj(m) // derinlik ayarlı (kullanıcı 2026-10-22): mekanizmasız boy dolapta 20–60 cm
+          ? `<div class="field"><label for="m-depth">Derinlik <output>${modD(m)} mm</output></label><input type="range" id="m-depth" min="${TALL_DMIN}" max="${TALL_DMAX}" step="${TALL_DSTEP}" value="${modD(m)}" data-m="depth"></div>`
+            + (tallOne(m) || tallElcik(m) ? `<p class="hint" style="margin:-6px 0 10px">İç çekmece en az ${IDR_MIN_D/10} cm derinlikte konur.</p>` : '')
+          : `<p class="hint" style="margin:-6px 0 10px">Derinlik sabit ${String(Tt.D/10).replace('.', ',')} cm</p>`)}
       ${Tt.Hopts ? `<div class="field"><label for="m-height">Yükseklik <output>${m.height} mm</output></label><input type="range" id="m-height" min="${Tt.Hmin}" max="${Tt.Hmax}" step="50" value="${m.height}" data-m="height"></div>` // sürgü; normalize izinli değerlere (Hopts) çeker
         : Tt.Hmin === Tt.Hmax ? '' : `<div class="field"><label for="m-height">Yükseklik <output>${m.height} mm</output></label><input type="range" id="m-height" min="${layoutOf(m).hMin || Tt.Hmin}" max="${Tt.Hmax}" step="100" value="${m.height}" data-m="height"></div>`}
       ${tallElcik(m) ? `<div class="lbl" style="margin-bottom:6px">Elcik</div>
@@ -3549,7 +3557,7 @@ function drawPos(el){
   let F = `<line x1="8" y1="${fy(0)}" x2="${fw - 8}" y2="${fy(0)}" stroke="currentColor" stroke-width="1.5"/>`;
   topRuns(c, mx).forEach(r => F += `<rect x="${Xf(r.x0)}" y="${fy(top)}" width="${r.L*s}" height="${Math.max(2.5, c.top.t*s)}" fill="var(--muted)" opacity=".55"/>`);
   c.mirrors.forEach(mi => F += `<rect x="${Xf(mi.x - mi.w/2)}" y="${fy(mi.bottom + mi.h)}" width="${mi.w*s}" height="${mi.h*s}" rx="${mi.shape === 'dikdortgen' ? 2 : mi.w*s/2}" fill="none" stroke="var(--muted)" stroke-dasharray="4 3"/>`);
-  c.modules.forEach((m, i) => { const r = mx.map[m.uid], d = moduleDims(m, c), on = ui.selSet.has(m.uid), D = isTall(m) || isUpper(m) ? TYPES[m.type].D : c.depth, cx = (r.x0 + r.x1)/2, up = isUpper(m);
+  c.modules.forEach((m, i) => { const r = mx.map[m.uid], d = moduleDims(m, c), on = ui.selSet.has(m.uid), D = isTall(m) || isUpper(m) ? modD(m) : c.depth, cx = (r.x0 + r.x1)/2, up = isUpper(m);
     const side = (X, y, h, ph2) => [[r.x0 - r.lt, r.lt], [r.x1, r.rt]].map(([x, t]) => t ? `<rect x="${X(x)}" y="${y}" width="${t*s}" height="${h}" fill="var(--line)" stroke="currentColor" stroke-width=".7"/>` : '').join('');
     P += `<g class="pm" data-uid="${m.uid}">${side(Xp, pz(0), D*s)}<rect x="${Xp(r.x0)}" y="${pz(0)}" width="${m.width*s}" height="${D*s}" ${st(on, up ? 'none' : 'var(--raise)')}${up ? ' stroke-dasharray="5 3"' : ''}/><text x="${Xp(cx)}" y="${pz(D/2) + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="${on ? 'var(--accent)' : 'currentColor'}">M${i + 1}</text></g>`;
     F += `<g class="pm" data-uid="${m.uid}">${side(Xf, fy(d.topY), d.H*s)}<rect x="${Xf(r.x0)}" y="${fy(d.topY)}" width="${m.width*s}" height="${d.H*s}" ${st(on, 'var(--raise)')}/>${front(m, r, d)}<text x="${Xf(cx)}" y="${fy(d.topY) + d.H*s/2 + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="${on ? 'var(--accent)' : 'currentColor'}">M${i + 1}</text></g>`;
@@ -3841,7 +3849,7 @@ function onField(e, live){
     });
     refresh({left:false}); return true;
   }
-  if ((t.dataset.m === 'bottom' || t.dataset.m === 'height' || t.dataset.m === 'elcikY' || t.dataset.m === 'x') && m){ // x: üst modülün yatay konumu // boy dolap alt kenarı / yüksekliği / elcik yüksekliği: sürgü canlı
+  if ((t.dataset.m === 'bottom' || t.dataset.m === 'height' || t.dataset.m === 'elcikY' || t.dataset.m === 'x' || t.dataset.m === 'depth') && m){ // x: üst modülün yatay konumu // boy dolap alt kenarı / yüksekliği / elcik yüksekliği: sürgü canlı
     const ho = t.dataset.m === 'height' && TYPES[m.type].Hopts, v = ho ? ho.reduce((a, b) => Math.abs(b - t.value) < Math.abs(a - t.value) ? b : a) : +t.value; // B1 Çamaşır: izinli yüksekliklere çeker
     m[t.dataset.m] = v;
     if (live){ const o = t.closest('.field').querySelector('output'); if (o) o.textContent = v + ' mm'; scheduleBuild(); }
@@ -4036,7 +4044,7 @@ function renderOrders(){
         <dt>Gövde</dt><dd>${MATS[oc.body.mat].label} · ${colorName(oc.body.mat, oc.body.color)}</dd>
         <dt>Kapak</dt><dd>${MATS[oc.front.mat].label} · ${colorName(oc.front.mat, oc.front.color)} · ${frontStyleText(oc.front)}</dd>
         <dt>Kulp tipi</dt><dd>${handleColorText(oc)}</dd>
-        <dt>Tezgah</dt><dd>${hasTop(oc) ? `${topById(oc.top.color).name} · ${oc.top.t} mm · ${TOP_SURF[oc.top.surf].label}` : 'Yok'}${(() => { const no = oc.modules.map((m, i) => !isTall(m) && !isUpper(m) && !modTop(m) ? `M${i+1}${panelOn(m) ? ' (üst panel)' : ''}` : '').filter(Boolean); return hasTop(oc) && no.length ? ` · tezgahsız: ${no.join(', ')}` : !hasTop(oc) && oc.modules.some(panelOn) ? ` · üst panel: ${oc.modules.map((m, i) => panelOn(m) ? 'M' + (i + 1) : '').filter(Boolean).join(', ')}` : ''; })()}</dd>
+        <dt>Tezgah</dt><dd>${hasTop(oc) ? `${topById(oc.top.color).name} · ${oc.top.t} mm` : 'Yok'}${(() => { const no = oc.modules.map((m, i) => !isTall(m) && !isUpper(m) && !modTop(m) ? `M${i+1}${panelOn(m) ? ' (üst panel)' : ''}` : '').filter(Boolean); return hasTop(oc) && no.length ? ` · tezgahsız: ${no.join(', ')}` : !hasTop(oc) && oc.modules.some(panelOn) ? ` · üst panel: ${oc.modules.map((m, i) => panelOn(m) ? 'M' + (i + 1) : '').filter(Boolean).join(', ')}` : ''; })()}</dd>
         <dt>Yan kapama</dt><dd>${sidesText(oc)}</dd>
         <dt>Aynalar</dt><dd>${oc.mirrors.map(m => `${esc(MIRRORS[m.shape] || '')} ${+m.w || 0}×${+m.h || 0}${m.led ? ' · ' + LED_TXT : ''}`).join(', ') || '—'}</dd>
         <dt>Tutar</dt><dd class="mono">${fmtTL(o.total || p.total)} <span class="muted">KDV dahil</span></dd></dl></div>
@@ -4052,7 +4060,7 @@ function renderOrders(){
     <h2 class="sec" style="margin-top:20px">Modüller</h2>
     <div class="tbl-wrap"><table><thead><tr><th>Modül</th><th>Tip</th><th>Dizilim</th><th>G × Y × D (cm)</th><th>Özellik</th></tr></thead><tbody>
       ${oc.modules.map((m, i) => { const mx = moduleX(oc), s = sinkOver(m, oc), dm = moduleDims(m, oc);
-        return `<tr><td class="mono">M${i+1}</td><td>${TYPES[m.type].label}</td><td>${(LAYOUTS[m.type].find(l => l.id === m.layout) || {}).name || ''}</td><td class="mono">${m.width/10} × ${Math.round(dm.H/10)} × ${(isTall(m) || isUpper(m) ? TYPES[m.type].D : oc.depth)/10}</td>
+        return `<tr><td class="mono">M${i+1}</td><td>${TYPES[m.type].label}</td><td>${(LAYOUTS[m.type].find(l => l.id === m.layout) || {}).name || ''}</td><td class="mono">${m.width/10} × ${Math.round(dm.H/10)} × ${(isTall(m) || isUpper(m) ? modD(m) : oc.depth)/10}</td>
         <td>${[m.hidden ? 'Gizli Çekmece' : '', tallIdr(m).length ? 'İç çekmece: ' + tallIdr(m).join(' · ') : '', s ? 'U kesim (lavabo)' : '', Object.entries(m.org || {}).filter(([k, x]) => +k < drawerHeights(m, oc).length && x && x !== 'yok' && ORGS[x]).map(([, x]) => ORGS[x].label).join(', ')].filter(Boolean).join(' · ') || '—'}</td></tr>`; }).join('')}
     </tbody></table></div>`;
 }
