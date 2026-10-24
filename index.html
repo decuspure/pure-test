@@ -480,17 +480,25 @@ const tallNoGola = m => tallOne(m); // gola yalnız tek kapaklı boy dolapta olm
 const hingeN = h => h > 1500 ? 4 : h > 900 ? 3 : 2;
 /* menteşe yükseklikleri: uçlardan 100 mm, aradakiler eşit; iç çekmece varsa (zones: ön panel [alt, üst]) çekmeceye denk gelen menteşe
    en yakın boş araya alınır (çekmeceler arası ve en üst çekmece–sabit raf arası IDR_GAP; montaj plakası 46 mm) — kullanıcı 2026-10-12 */
+/* RAFLARLA ÇAKIŞMA (kullanıcı 2026-10-24 "menteşeler raflarla üst üste gelip çakışıyor"): bütün raflar (sabit + ayarlı) verilir; montaj plakası
+   (46 mm, ± HINGE_CLR) bir rafa değen menteşe en yakın boş yüksekliğe kayar (önce yakın olan yön, kapak uçlarından 60 mm içeride kalır); diğer menteşeye de değmez */
+const HINGE_CLR = 27; // menteşe merkezinden plakanın ucu (23) + 4 mm pay
 const hingeYs = (y0, y1, zones = [], shelves = []) => {
-  const n = hingeN(y1 - y0), ys = Array.from({length: n}, (_, i) => y0 + 100 + (y1 - y0 - 200)*i/(n - 1));
-  if (!zones.length) return ys;
-  const gaps = zones.map((z, i) => (z[1] + (i + 1 < zones.length ? zones[i + 1][0] : z[1] + IDR_GAP))/2), used = new Set();
-  return ys.map(y => {
-    if (!zones.some(z => y + 23 > z[0] && y - 23 < z[1])){ // çekmeceye değmiyor: sabit rafa denk gelirse rafın üstüne kayar
-      const s = shelves.find(s => y + 23 > s[0] && y - 23 < s[1]); return s ? s[1] + 28 : y;
-    }
-    const gi = gaps.map((g, i) => i).filter(i => !used.has(i)).sort((a, b) => Math.abs(gaps[a] - y) - Math.abs(gaps[b] - y))[0];
-    if (gi == null) return y; used.add(gi); return gaps[gi];
-  });
+  const n = hingeN(y1 - y0); let ys = Array.from({length: n}, (_, i) => y0 + 100 + (y1 - y0 - 200)*i/(n - 1));
+  if (zones.length){
+    const gaps = zones.map((z, i) => (z[1] + (i + 1 < zones.length ? zones[i + 1][0] : z[1] + IDR_GAP))/2), used = new Set();
+    ys = ys.map(y => {
+      if (!zones.some(z => y + 23 > z[0] && y - 23 < z[1])) return y; // çekmeceye değmiyor (raf çakışması aşağıda)
+      const gi = gaps.map((g, i) => i).filter(i => !used.has(i)).sort((a, b) => Math.abs(gaps[a] - y) - Math.abs(gaps[b] - y))[0];
+      if (gi == null) return y; used.add(gi); return gaps[gi];
+    });
+  }
+  const lo = y0 + 60, hi = y1 - 60, placed = [], hit = (list, s, k) => list.some(([a, b]) => s + k > a && s - k < b);
+  // iç çekmece ön panelleri arası 50 mm: orada yalnız plaka (±23) sığar; raflarda ± HINGE_CLR
+  const free = s => s >= lo && s <= hi && !hit(shelves, s, HINGE_CLR) && !hit(zones, s, 23) && !placed.some(p => Math.abs(p - s) < 2*HINGE_CLR);
+  return ys.map(y => { let r = y;
+    if (!free(y)) for (let d = 1; d < 400; d++){ if (free(y - d)){ r = y - d; break; } if (free(y + d)){ r = y + d; break; } }
+    placed.push(r); return r; });
 };
 const pairShelves = H => Math.max(1, Math.round(H/300) - 1);
 /* yalnız golalı boy dolaplar: B2 ve iki kapaklı B1 (kulp seçimi yok, yalnız profil rengi); tek kapaklı B1'de gola olamaz */
@@ -2245,13 +2253,11 @@ function buildHinge(g, dg, {xi, si, sgn, hy, cd, fT, T, gap, px, z155}){
   const xu = u => xi + si*u;                           // yan panelin iç yüzünden içeri u mm
   const phX = (x, y, z) => { cyl(4.2, 1.6, pin, g, x, y, z, 'x'); put(new THREE.BoxGeometry(.5, 5, 1), dk, g, x + si*.6, y, z); put(new THREE.BoxGeometry(.5, 1, 5), dk, g, x + si*.6, y, z); }; // yıldız başlı vida (gövdede)
   const phZ = (x, y, z) => { cyl(3.8, 1.4, pin, dg, x, y, z, 'z'); put(new THREE.BoxGeometry(4.4, .9, .5), dk, dg, x, y, z - .6); put(new THREE.BoxGeometry(.9, 4.4, .5), dk, dg, x, y, z - .6); }; // (kapakta)
-  // ---------- GÖVDE: artı biçimli montaj plakası + kol + kol başı (A pimleri) ----------
+  // ---------- GÖVDE: düz montaj plakası + kol + kol başı (A pimleri) ----------
   // BLUM TEKNİK FÖYÜ (CLIP top BLUMOTION 110°, s. 4): menteşe kapağın arka yüzünden 66,5 mm içeri uzanır; plaka vidaları önden 37 mm, üst üste 32 mm arayla
-  // (artı biçimli plaka); kolun yan panelden çıkıntısı 0 plakada 21,5 mm (S); kap Ø35 × 13 mm
-  const zP = cd - 37;                                                                      // plaka vidaları önden 37 mm
-  put(bb(3, 15, 40, 3, .5), H, g, xu(1.5), hy, cd - 40);                                   // plakanın boyuna kolu (kolun altında)
-  put(bb(2.5, 44, 11, 4, .5), H, g, xu(1.25), hy, zP);                                     // dikey kanatlar (artı)
-  [-16, 16].forEach(dy => cyl(3.8, 1.2, pin, g, xu(3), hy + dy, zP, 'x'));                  // kanat vidaları (32 mm arayla)
+  // kolun yan panelden çıkıntısı 0 plakada 21 mm; kap Ø35, delik derinliği 11,5 mm, BLUMOTION kabın içinde (kullanıcının belgesi: Blum EP-239 CLIP top BLUMOTION 107°, 2026-10-24)
+  // MONTAJ PLAKASI DÜZ (LİNEER): kolun altında boyuna plaka, ARKADA T / ARTI KANAT YOK (kullanıcı: "arkada T ayak yok bizde")
+  put(bb(3, 16, 50, 3, .5), H, g, xu(1.5), hy, cd - 44);                                   // düz montaj plakası (kolun altında, arkada kolun ucundan biraz taşar)
   const aB = cd - (z155 ? 62 : 66.5), aF = cd - 14;                                        // kol gövdesi 14 (u) × 16 (y): kapak arka yüzünden 66,5 mm (155°: föyde 62)
   put(bb(14, 16, aF - aB, 2, .9), H, g, xu(10), hy, (aB + aF)/2);
   put(bb(5, 10, 8, 1, .4), H, g, xu(1.5), hy, aB + 8);                                     // klips dili
@@ -2263,8 +2269,12 @@ function buildHinge(g, dg, {xi, si, sgn, hy, cd, fT, T, gap, px, z155}){
   const hz0 = Math.min(A1[1], A2[1], aF) - 4, hz1 = Math.min(cd - .5, Math.max(A1[1], A2[1]) + 3.5); // kol başı gövde önünü geçmez (kapalı kapağa girmesin)
   put(bb(18, 16, hz1 - hz0, 2.5, .9), H, g, xu(11), hy, (hz0 + hz1)/2);
   const top = xu(17);                                                                       // kolun iç (görünen) yüzü
-  put(bb(1, 7, 9, 1.5, .2), dk, g, top, hy, cd - 40);                                      // pencere
-  phX(top + si*.4, hy, cd - 30); phX(top + si*.4, hy, cd - 50);                            // ayar vidaları
+  // KOL KAPAĞI + "blum" KABARTMASI (Blum EP-239 ürün fotoğrafı): kolun görünen yüzünün büyük kısmını kaplayan hafif kabarık kapak, yazı ortada; ayar vidaları kapağın altında
+  put(bb(1.4, 14, aF - aB - 12, 2.5, .4), H, g, top + si*.5, hy, (aB + aF)/2 + 2);         // kol kapağı
+  { const lt = M.blumLogo || (M.blumLogo = new THREE.MeshStandardMaterial({map: (() => { const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64; const x = cv.getContext('2d');
+        x.clearRect(0, 0, 256, 64); x.fillStyle = '#5c5f64'; x.font = 'bold 46px Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('blum', 128, 34);
+        const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t; })(), transparent: true, depthWrite: false, metalness: .5, roughness: .3, polygonOffset: true, polygonOffsetFactor: -2})); // zemin saydam: yalnız yazı
+    const lg = new THREE.Mesh(new THREE.PlaneGeometry(17, 5), lt); lg.rotation.y = si > 0 ? Math.PI/2 : -Math.PI/2; lg.position.set(top + si*1.25, hy, (aB + aF)/2 + 2); lg.raycast = () => {}; g.add(lg); }
   [0, 1, 2].forEach(k => put(new THREE.BoxGeometry(.8, 11, 1.2), dk, g, top, hy, aB + 3.5 + k*2.8)); // arka oluklar
   [-1, 1].forEach(sy => { cyl(2.4, 1, pin, g, xu(10), hy + sy*8.3, cd - 56);              // perçin
     [A1, A2].forEach(A => cyl(3.1, 1.2, pin, g, A[0], hy + sy*8.4, A[1])); });             // mafsal pimleri (kol başında)
@@ -2273,7 +2283,7 @@ function buildHinge(g, dg, {xi, si, sgn, hy, cd, fT, T, gap, px, z155}){
   cyl(19, 1.2, H, dg, cx, hy, zb - .6, 'z');                                                // kap ağzı halkası
   cyl(16.8, 1.4, dk, dg, cx, hy, zb - .5, 'z');                                             // kabın içi (karanlık)
   const fh = z155 ? 3.2 : 2.2;                                                              // flanş: 155° föyde 57 × 22 × 3,2
-  put(z155 ? bb(22, 57, 3.2, 5, .6) : bb(17, 56, 2.2, 5, .5), H, dg, cx + sgn*9.5, hy, zb - fh/2); // vida kanadı (45/9,5)
+  put(z155 ? bb(22, 57, 3.2, 5, .6) : bb(22, 58, 2.2, 5.5, .5), H, dg, cx + sgn*9.5, hy, zb - fh/2); // vida kanadı (45/9,5); 107°'de köşeleri yuvarlatılmış dikdörtgen 22 × 58 (Blum EP-239 fotoğrafı)
   [-22.5, 22.5].forEach(dy => { cyl(4.6, .6, dk, dg, cx + sgn*9.5, hy + dy, zb - fh - .1, 'z'); phZ(cx + sgn*9.5, hy + dy, zb - fh - .4); });
   { const b1 = Dl(z155 ? ZB : kin.B1), b2 = Dl(z155 ? ZB : kin.B2), ka = (b1[0] + b2[0])/2; // mafsal yuvası: B pimlerinin çevresinde, kabın kenar tarafında
     if (z155) put(bb(11, 22, 15, 3, .7), H, dg, sgn*(T - gap + 6), hy, zb - 7.5);        // 155°: B'yi saran yuva, kapalıyken yan panelin iç yüzünün içinde kalır (panele girmez)
@@ -2403,7 +2413,8 @@ function buildTall(m, x0, idx, mx){
     const dg = new THREE.Group(); dg.position.set(px, 0, cd + fT + (th === 'push' ? PUSH_EXTRA : 0)); dg.userData.key = m.uid + ':d' + k; g.add(dg); // push-open: kapak gövdeden 3 mm önde (TIP-ON pimi)
     // SİYAH BLUM MENTEŞE (kapak açılınca görünür): kapakta Ø35 kap (kapak arkasında, kenardan 22,5 mm), gövdede yan panelin iç yüzünde
     // montaj plakası + kol (ön kenara kadar). Adet parça listesiyle aynı (hingeN); uçlardan 100 mm, aradakiler eşit aralıklı
-    if (!d.pull){ const tin = tallInterior(m, c), hys = hingeYs(d.y0, d.y1, tin.rows.map(r => [bottomY + r.fy, bottomY + r.fy + r.fh]), tin.fixed.map(f => [bottomY + f.y - T/2, bottomY + f.y + T/2])), xi = R ? x0 + W - T : x0 + T, si = R ? -1 : 1;
+    if (!d.pull){ const tin = tallInterior(m, c), shY = pair && !tallElcik(m) ? shelfYs(T, H - T, pairShelves(H), T) : tin.fixed.map(f => f.y).concat(tin.adj); // bütün raflar (sabit + ayarlı): menteşe raflara değmesin
+      const hys = hingeYs(d.y0, d.y1, tin.rows.map(r => [bottomY + r.fy, bottomY + r.fy + r.fh]), shY.map(y => [bottomY + y - T/2, bottomY + y + T/2])), xi = R ? x0 + W - T : x0 + T, si = R ? -1 : 1;
       hys.forEach(hy => buildHinge(g, dg, {xi, si, sgn, hy, cd, fT, T, gap: R ? df.r : df.l, px, z155: hinge155(m)})); }
     if (pair && th === 'elcik' && (R ? 'R' : 'L') === m.elcikSide){ // B2 elcikli: elcik yalnız seçilen kapakta (m.elcikSide), iç (birleşim) kenarda dikdörtgen oyuk (ELCIK), kapak kalınlığı boyunca
       // kesit (kullanıcının yan kesiti): ön yüzde ELCIK.h (300) açıklık, ELCIK.lip (2) düz + ELCIK.ch (12) pahla içte ELCIK.hIn (360)'e genişler;
@@ -2503,7 +2514,7 @@ function buildUpper(m, x0){
     const R = d.R, sgn = R ? -1 : 1, px = R ? x0 + W - df.r : x0 + df.l, dw = d.dw, gap = R ? df.r : df.l;
     const dg = new THREE.Group(); dg.position.set(px, 0, cd + fT + (th === 'push' ? PUSH_EXTRA : 0)); dg.userData.key = m.uid + ':d' + k; g.add(dg); // push-open: kapak gövdeden 3 mm önde (TIP-ON pimi)
     const xi = R ? x0 + W - T : x0 + T, si = R ? -1 : 1;
-    hingeYs(y0, y1).forEach(hy => buildHinge(g, dg, {xi, si, sgn, hy, cd, fT, T, gap, px, z155: false}));
+    hingeYs(y0, y1, [], sys.map(ay => [bottomY + ay - T/2, bottomY + ay + T/2])).forEach(hy => buildHinge(g, dg, {xi, si, sgn, hy, cd, fT, T, gap, px, z155: false})); // raflara değmez
     const mz = m.mirrorDoor ? 4 : 0, glass = upperGlass(m), F = UPPER_FRAME, yc = (y0 + y1)/2;
     if (glass){ // camlı kapak: TEK PARÇA 5 cm çerçeve (kapak plakası, ortası boşaltılmış; birleşim çizgisi yok) + arkadan lambaya oturan 4 mm cam
       const xa = Math.min(0, sgn*dw), xb = Math.max(0, sgn*dw), sh = new THREE.Shape(), ho = new THREE.Path();
