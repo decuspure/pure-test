@@ -770,13 +770,24 @@ const PRICE = {
   topM2:{6:85,30:210,80:420,120:580},
   sink:{integrated:195}, // entegre eviye ÖRNEK
   // çanak lavabo satış € (kullanıcı 2026-10-26): Artis tek renk; Antao beyaz (R1) ve mat renkler (RW, AM, R8, R7) ayrı
-  vessel:{std:554.56, '4A7240':{R1:638.45, mat:748.235}, '4A7351':{R1:688.715, mat:809.64}, '4A7465':{R1:752.015, mat:885.22}}, drain:{gizli:50, rampa:44, zarf:68}, faucetHole:0 /* batarya fiyata girmez (kullanıcı 2026-10-13) */,
-  mirrorM2:76, glassM2:45 /* camlı kapak camı 4 mm temperli, ÖRNEK */, mirrorBase:18, mirrorShape:{organik:1.4}, led:52, vat:.20,
+  vessel:{std:554.56, '4A7240':{R1:638.45, mat:748.235}, '4A7351':{R1:688.715, mat:809.64}, '4A7465':{R1:752.015, mat:885.22}}, drain:{gizli:50, rampa:44, zarf:68}, // batarya SATILMAZ (kullanıcı 2026-10-26): fiyatta ve listelerde batarya kalemi yok; 3B'de yalnız görsel
+  mirrorM2:76, glassM2:45 /* camlı kapak camı 4 mm temperli, ÖRNEK */, mirrorBase:18, mirrorShape:{organik:1.4}, vat:.20,
+  // AYNA LED (kullanıcı 2026-10-26, satış €): sabit boy Flex LED (cm → €), arka çerçeve çevresine göre bir üst boy; 500 cm üstü 500 + kalan, birden çok parçada çoklayıcı; ayna başına 1 trafo 5 A 12 V
+  ledStrip:{75:16.48, 100:20.6, 125:24.76, 150:28.88, 200:33, 250:45.36, 300:57.72, 400:70.12, 500:82.48}, ledSplit:{3:14.84, 6:18.16}, ledDriver:20 /* 5 A 12 V */,
   bandM:{kaplama:1, lam:0.478}, // kenar bandı satış €/m (bant enine göre fark yok); lake kenarları boyalı, bant yok
   bandLabor:0.96 // bant yapıştırma işçiliği €/m (bantlı her metre)
 };
 const lakeM2 = (k, col) => { const L = PRICE.lake; return (L.mdf[k] || 0) + L.faces*(L.astar + L.tiner + (L.boya[col] || 0) + L.labor); };
 const vesselPrice = s => { const p = PRICE.vessel[s.model] ?? PRICE.vessel.std; return typeof p === 'number' ? p : (s.color === 'R1' ? p.R1 : p.mat); };
+/* ayna LED'i: arka taşıyıcının (ayna − 40 mm) çevresi; sabit boylardan bir üstü (ör. 245 → 250 cm), 500 cm üstünde 500'lükler + kalan; parça > 1 ise çoklayıcı (3'lü / 6'lı); 1 trafo */
+function ledParts(mi){
+  const need = Math.ceil(mirrorShape(mi.shape, mi.w - 40, mi.h - 40).getLength()/10), sizes = Object.keys(PRICE.ledStrip).map(Number).sort((a, b) => a - b), max = sizes[sizes.length - 1];
+  const strips = []; let rest = need; while (rest > max){ strips.push(max); rest -= max; } strips.push(sizes.find(s => s >= rest));
+  const split = strips.length > 1 ? (strips.length <= 3 ? 3 : 6) : 0;
+  const price = strips.reduce((a, s) => a + PRICE.ledStrip[s], 0) + (split ? PRICE.ledSplit[split] : 0) + PRICE.ledDriver;
+  const text = `Flex LED ${strips.map(s => s + ' cm').join(' + ')} (çevre ${need} cm)${split ? ` · ${split}'${split === 3 ? 'lü' : 'lı'} çoklayıcı` : ''} · 5 A 12 V trafo`;
+  return {need, strips, split, price, text};
+}
 const golaPrice = (fin, L) => (fin === 'front' ? PRICE.golaM.front : PRICE.golaM.alu)*L/1000; // profil boyu (mm) × €/m
 
 /* ============================================================
@@ -1462,8 +1473,8 @@ function priceOf(c = cfg){
   const top = topRuns(c, mx).reduce((a, r) => a + r.L, 0)*topD(c)/1e6 * PRICE.topM2[c.top.t]; // yalnız tezgahlı modüllerin üstü
   const band = Object.values(cl.bands).reduce((s, b) => s + b.m*(PRICE.bandM[b.mat] || 0), 0);
   const bandLab = Object.values(cl.bands).reduce((s, b) => s + b.m, 0)*PRICE.bandLabor;
-  const sinks = c.sinks.reduce((s,k) => s + (k.type === 'integrated' ? PRICE.sink.integrated + PRICE.drain[k.drain] : vesselPrice(k)) + (k.faucet === 'delikli' ? PRICE.faucetHole : 0), 0);
-  const mirrors = c.mirrors.reduce((s,m) => s + (m.w*m.h/1e6)*PRICE.mirrorM2*(PRICE.mirrorShape[m.shape] || 1) + (m.led ? PRICE.led : 0) + PRICE.mirrorBase, 0);
+  const sinks = c.sinks.reduce((s,k) => s + (k.type === 'integrated' ? PRICE.sink.integrated + PRICE.drain[k.drain] : vesselPrice(k)), 0);
+  const mirrors = c.mirrors.reduce((s,m) => s + (m.w*m.h/1e6)*PRICE.mirrorM2*(PRICE.mirrorShape[m.shape] || 1) + (m.led ? ledParts(m).price : 0) + PRICE.mirrorBase, 0);
   const lines = [
     ['Gövde ve iç parçalar', carcass],
     ['Kapaklar', fronts],
@@ -3055,15 +3066,11 @@ function mirrorShape(type, w, h){
 }
 /* LED halesi: ayna formu bulanık gölge olarak tuvale çizilir (yalnız gölge görünür, keskin kenar yok); form+ölçü başına önbellekte */
 /* ayna LED'i: 3000 K sıcak beyaz, 1000 lm. Renk Kelvin'den (Tanner Helland yaklaşımı), parlaklık lümene göre (1500 lm = tam) */
+// LED HALE RENGİ (kullanıcı 2026-10-26 "3000 K olacak, turuncu değil daha sarı"): 3000 K kara cismin ham sRGB karşılığı (Planck x .4369, y .4041 → D65 ekranda ~ ffb86d) TURUNCU görünür,
+// çünkü ekran beyazı 6500 K; odada göz ışığa uyum sağladığından 3000 K sıcak / sarımsı beyaz algılanır. Hale bu algılanan tonla: sarımsı sıcak beyaz (ton ~47°)
+const LED_GLOW_A = 1, LED_GLOW_RGB = [255, 228, 165]; // hale saydamlığı (beyaz duvarda görünür sıcak ışık)
 const LED_K = 3000, LED_LM = 1000, LED_TXT = `LED ${LED_K} K · ${LED_LM} lm`;
 const LED_PAD = Math.round(120 + 50*Math.sqrt(LED_LM/1500)); // halenin aynadan taşma mesafesi (mm), lümenle büyür
-function kelvinRGB(k){
-  const t = k/100, cl = v => Math.round(Math.max(0, Math.min(255, v)));
-  const r = t <= 66 ? 255 : 329.7*Math.pow(t - 60, -.1332);
-  const g = t <= 66 ? 99.47*Math.log(t) - 161.12 : 288.12*Math.pow(t - 60, -.0755);
-  const b = t >= 66 ? 255 : t <= 19 ? 0 : 138.52*Math.log(t - 10) - 305.04;
-  return [cl(r), cl(g), cl(b)];
-}
 const LED_KEEP = 12, ledKeys = []; // ayna hale dokusu önbelleği sınırlı: sürgü sürüklerken her ölçü için doku birikmesin, en eskiler bırakılır
 function ledGlowMat(shape, w, h){
   const key = `led_${shape}_${w}_${h}`;
@@ -3083,10 +3090,11 @@ function ledGlowMat(shape, w, h){
     const pts = mirrorShape(shape, w - 10, h - 10).getPoints(48), off = cw + 50; // şekil tuvalin dışında çizilir, gölgesi içeri kaydırılır
     const path = () => { x.beginPath(); pts.forEach((p, i) => { const px = cw/2 + p.x*s - off, py = ch/2 - p.y*s; i ? x.lineTo(px, py) : x.moveTo(px, py); }); x.closePath(); };
     x.shadowOffsetX = off; x.fillStyle = '#000';
-    const [lr, lg, lb] = kelvinRGB(LED_K), lm = Math.min(1, LED_LM/1500); // renk 3000 K, yoğunluk lümene göre
-    [[pad*s*.95, .9], [pad*s*.5, .9], [pad*s*.22, .85], [pad*s*.08, .7]].forEach(([blur, a]) => { x.shadowBlur = blur; x.shadowColor = `rgba(${lr},${lg},${lb},${a*lm})`; path(); x.fill(); });
+    // renk: 3000 K algılanan sıcak beyaz (LED_GLOW_RGB), yoğunluk lümene göre
+    const [lr, lg, lb] = LED_GLOW_RGB, lm = Math.min(1, LED_LM/1500);
+    [[pad*s*.95, .9], [pad*s*.95, .9], [pad*s*.5, .9], [pad*s*.5, .9], [pad*s*.22, .85], [pad*s*.08, .7]].forEach(([blur, a]) => { x.shadowBlur = blur; x.shadowColor = `rgba(${lr},${lg},${lb},${a*lm})`; path(); x.fill(); });
     const tx = new THREE.CanvasTexture(cv); tx.encoding = THREE.sRGBEncoding;
-    return new THREE.MeshBasicMaterial({map: tx, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending}); // ışık duvarın rengine eklenir (aydınlatma etkisi)
+    return new THREE.MeshBasicMaterial({map: tx, transparent: true, depthWrite: false, opacity: LED_GLOW_A, toneMapped: false}); // ton eşleme rengi doyurmasın // normal karışım: beyaz duvarda toplamalı ışık 255’e doyup görünmüyordu (kullanıcı 2026-10-26); sıcak renk duvarın üstüne yarı saydam
   });
 }
 function buildMirror(mi){
@@ -4263,14 +4271,14 @@ async function exportCutXlsx(c, title){
   // ---- 4. DONANIM ----
   { const N = 6, ws = sheet('Donanım', [9, 70, 7, 13, 13, 1], 4); titleRows(ws, N - 1, sub);
     header(ws, ['Modül', 'Kalem', 'Adet', 'Birim fiyat', 'Tutar']); const f = ws.rowCount + 1;
-    const add = (mod, item, qty, price) => { const r = ws.addRow([mod, item, qty, price, null]); r.getCell(5).value = {formula: `C${r.number}*D${r.number}`, result: Math.round(qty*price*100)/100};
+    const add = (mod, item, qty, price) => { const r = ws.addRow([mod, item, qty, price, null]); if (price != null) r.getCell(5).value = {formula: `C${r.number}*D${r.number}`, result: Math.round(qty*price*100)/100}; // fiyatsız satır (lavabo, ayna: fiyatı Özet'te) boş
       r.getCell(4).numFmt = r.getCell(5).numFmt = '#,##0.00 "€"'; body(r, N - 1); };
     cl.hw.forEach(h => add(h.mod, h.item, h.qty, h.price || 0));
-    cl.sinksOut.forEach(s => add('—', `${s.label} · ${s.dims} · ${s.s.faucet === 'delikli' ? 'batarya delikli' : 'deliksiz'}`, 1, 0));
-    c.mirrors.forEach(m => add('—', `Ayna ${MIRRORS[m.shape]} ${m.w}×${m.h}${m.led ? ' + ' + LED_TXT : ''}`, 1, 0));
+    cl.sinksOut.forEach(s => add('—', `${s.label} · ${s.dims}${s.s.faucet === 'delikli' ? ' · tezgahta batarya deliği' : ''}`, 1, null));
+    c.mirrors.forEach(m => add('—', `Ayna ${MIRRORS[m.shape]} ${m.w}×${m.h}${m.led ? ' + ' + LED_TXT + ' · ' + ledParts(m).text : ''}`, 1, null));
     const t = ws.addRow(['', 'Toplam', '', '', {formula: `SUM(E${f}:E${ws.rowCount})`, result: Math.round(cl.hw.reduce((a, h) => a + h.qty*(h.price || 0), 0)*100)/100}]);
     t.getCell(5).numFmt = '#,##0.00 "€"'; body(t, N - 1, {font: {bold: true}});
-    ws.addRow([]); const n = ws.addRow(['', 'Lavabo ve ayna fiyatları Özet sayfasındaki dökümde; burada 0 görünür. Fiyatlar örnektir.']); n.getCell(2).font = {name: FONT, size: 9, italic: true, color: {argb: 'FF666666'}}; }
+    ws.addRow([]); const n = ws.addRow(['', 'Lavabo ve ayna fiyatları Özet sayfasındaki dökümde.']); n.getCell(2).font = {name: FONT, size: 9, italic: true, color: {argb: 'FF666666'}}; }
 
   // ---- 5. KENAR BANDI ----
   { const N = 3, ws = sheet('Kenar bandı', [60, 12, 1], 4); titleRows(ws, N - 1, sub + ' · net metraj, fire hariç');
@@ -4304,8 +4312,8 @@ function openCutList(c, title){
         <h2 class="sec" style="margin-top:14px">Kenar bandı</h2><div class="tbl-wrap"><table><tbody>${Object.entries(cl.bands).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${v.m.toFixed(2).replace('.', ',')} m</td></tr>`).join('') || '<tr><td class="muted">Bant yok (lake kenarlar boyalı)</td></tr>'}</tbody></table></div>
         <p class="hint" style="margin:6px 0 0">Net metraj (fire hariç); bant kendi kenarı boyunca (su yönü). Lake parçalarda kenarlar boyalı.</p></div>
       <div><h2 class="sec">Donanım ve aksesuar</h2><div class="tbl-wrap"><table><tbody>${cl.hw.map(h => `<tr><td class="mono">${h.mod}</td><td>${esc(h.item)}</td><td class="n">${h.qty}</td></tr>`).join('')}
-        ${cl.sinksOut.map(s => `<tr><td class="mono">—</td><td>${esc(s.label)} · ${s.dims} · ${s.s.faucet === 'delikli' ? 'batarya delikli' : 'deliksiz'}</td><td class="n">1</td></tr>`).join('')}
-        ${c.mirrors.map(m => `<tr><td class="mono">—</td><td>Ayna ${MIRRORS[m.shape]} ${m.w}×${m.h}${m.led ? ' + ' + LED_TXT : ''}</td><td class="n">1</td></tr>`).join('')}</tbody></table></div></div>
+        ${cl.sinksOut.map(s => `<tr><td class="mono">—</td><td>${esc(s.label)} · ${s.dims}${s.s.faucet === 'delikli' ? ' · tezgahta batarya deliği' : ''}</td><td class="n">1</td></tr>`).join('')}
+        ${c.mirrors.map(m => `<tr><td class="mono">—</td><td>Ayna ${MIRRORS[m.shape]} ${m.w}×${m.h}${m.led ? ' + ' + LED_TXT + ' · ' + ledParts(m).text : ''}</td><td class="n">1</td></tr>`).join('')}</tbody></table></div></div>
     </div>`);
 }
 
