@@ -2495,6 +2495,18 @@ function buildTall(m, x0, idx, mx){
    GOLA GÖVDE ALTINDA: alt tabla UPPER_GOLA (26 mm) yukarıda, altında profil (sırt + üst kanat), yanlar önden 26 mm kertilir; kapak profili örter, parmak kapağın altından girer.
    Ayarlı raflar eşit aralıklı; Blum 107° menteşe (gerçek dört çubuklu hareket); U1 tek kapak (sol / sağ menteşe), U2 iki kapak (sol soldan, sağ sağdan); aynalı kapakta önde 4 mm ayna */
 const upperShelves = (m, c = cfg) => { const T = matT(c.body.mat), {H} = moduleDims(m, c), a = m.handle === 'kanal' ? Math.max(T, UPPER_GOLA) : T; return shelfYs(a, H - T, Math.max(1, shelfN(H - T - a)), T); }; // alttan (mm), 3B ve parça listesi ortak
+/* tek parça yan dikme: yandan kesit (z = derinlik, y = yükseklik) x boyunca T kalınlıkta çekilir; notch: önde altta kertik {d, h}; su yönü dikey */
+function sideSlab(x, T, y0, y1, d, notch, mat, parent){
+  const sh = new THREE.Shape(); sh.moveTo(0, y0);
+  if (notch){ sh.lineTo(d - notch.d, y0); sh.lineTo(d - notch.d, y0 + notch.h); sh.lineTo(d, y0 + notch.h); } else sh.lineTo(d, y0);
+  sh.lineTo(d, y1); sh.lineTo(0, y1); sh.lineTo(0, y0);
+  const geo = new THREE.ExtrudeGeometry(sh, {depth: T, bevelEnabled: false}); geo.rotateY(-Math.PI/2); geo.translate(x + T, 0, 0); // kesit u → z, çekme → x
+  const tile = mat.userData && mat.userData.tile, uv = geo.attributes.uv;
+  if (tile){ for (let i = 0; i < uv.count; i++){ const u = uv.getX(i), v = uv.getY(i); uv.setXY(i, v/tile, u/tile); } uv.needsUpdate = true; } // damar dikey (yükseklik boyunca)
+  const mesh = new THREE.Mesh(geo, mat); mesh.castShadow = mesh.receiveShadow = true; parent.add(mesh);
+  if (ui.edges){ const ol = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), M.edge); ol.raycast = () => {}; parent.add(ol); }
+  return mesh;
+}
 function buildUpper(m, x0){
   const c = cfg, D = modD(m), T = matT(c.body.mat), fT = matT(c.front.mat), cd = D - fT, bt = backT(c.body.mat);
   const {H, bottomY} = moduleDims(m), W = m.width, cx = x0 + W/2, top = bottomY + H;
@@ -2502,8 +2514,8 @@ function buildUpper(m, x0){
   const bm = panelMat(c.body.mat, c.body.color), fm = panelMat(c.front.mat, c.front.color, c.front.fin);
   const th = m.handle, gola = th === 'kanal', cb = bottomY; // alt tabla modülün altında (kullanıcı 2026-10-20: boşluk kalmasın), golada önde profile kadar kısalır
   const golaCut = gola ? [{x0: x0 - 1, x1: x0 + W + 1, z0: cd - GOLA_D, z1: cd + 1, y0: bottomY - 1, y1: bottomY + UPPER_GOLA}] : [];
-  carve(T, H, cd, bm, x0 + T/2, bottomY + H/2, cd/2, g, golaCut, true, true);
-  carve(T, H, cd, bm, x0 + W - T/2, bottomY + H/2, cd/2, g, golaCut, true, true);
+  // yan dikmeler TEK PARÇA (kullanıcı 2026-10-26): gola kertiği (önde altta GOLA_D × UPPER_GOLA) kesitte; iki kutuya bölünmez, birleşim çizgisi yok
+  [x0, x0 + W - T].forEach(sx => sideSlab(sx, T, bottomY, top, cd, gola ? {d: GOLA_D, h: UPPER_GOLA} : null, bm, g));
   box(W - 2*T, T, gola ? cd - GOLA_D : cd, bm, cx, cb + T/2, (gola ? cd - GOLA_D : cd)/2, g);
   box(W - 2*T, T, cd - TALL_BACK_IN, bm, cx, top - T/2, TALL_BACK_IN + (cd - TALL_BACK_IN)/2, g); // üst tabla arkalığın önünde biter
   box(W - 2*T, top - cb - T, bt, bm, cx, cb + T + (top - cb - T)/2, TALL_BACK_IN - bt/2, g); // arkalık alt tablanın üstünden en üste kadar
