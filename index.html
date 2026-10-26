@@ -1127,6 +1127,35 @@ function posClashes(c = cfg, mx = moduleX(c)){
     mir.slice(k + 1).forEach(b => { const o = ov(a, b); if (o) out.push({...o, msg: `${a.n} ile ${b.n} üst üste geliyor.`}); });
     tops.forEach(t => { const o = ov(a, t); if (o) out.push({...o, msg: `${a.n} tezgahın altına iniyor (alt kenar ${String(a.y0/10).replace('.', ',')} cm, tezgah ${String(th/10).replace('.', ',')} cm).`}); });
   });
+  doorHits(c, mx).forEach(h => out.push(h));
+  return out;
+}
+/* KAPAK ÇARPMASI (kullanıcı 2026-10-26): boy dolap / üst modül kapağı tam açıkken (107° menteşede ~104°, iç çekmeceli boy dolapta 155°) 90°'yi geçip
+   menteşe tarafındaki komşu modülün önüne girer mi? Üstten bakışta kapak menteşeden (gövde kenarı, kapak önü) dışa doğru dw boyunda çizgi;
+   komşunun kenarına (kapaması dahil) ulaştığı noktada komşunun ön yüzünün (tezgah altında tezgah önü) gerisindeyse çarpar. Yükseklikleri örtüşenler */
+function doorHits(c = cfg, mx = moduleX(c)){
+  const out = [], cm = v => String(Math.round(v)/10).replace('.', ',');
+  const front = o => isTall(o) || isUpper(o) ? modD(o) + pushExtra(c, o) : Math.max(c.depth + sideFrontExtra(c) + pushExtra(c, o), modTop(o) ? topD(c) : 0);
+  c.modules.forEach((m, i) => {
+    if (!isTall(m) && !isUpper(m)) return;
+    const r = mx.map[m.uid], d = moduleDims(m, c), D = modD(m) + pushExtra(c, m), ang = (isTall(m) && hinge155(m) ? 155 : 104.4)*Math.PI/180;
+    const doors = TYPES[m.type].pair ? [{R: false, dw: m.width/2}, {R: true, dw: m.width/2}] : [{R: m.hinge !== 'L', dw: doorFit(m).dw}];
+    doors.forEach(dr => {
+      const dir = dr.R ? 1 : -1, xh = dr.R ? r.x1 : r.x0, reach = -dr.dw*Math.cos(ang), sn = dr.dw*Math.sin(ang); // reach: menteşeden dışa taşma
+      c.modules.forEach((o, j) => {
+        if (o === m) return;
+        const od = moduleDims(o, c), oy1 = isTall(o) || isUpper(o) ? od.topY : topH(c), ro = mx.map[o.uid];
+        if (Math.min(d.topY, oy1) - Math.max(d.bottomY, od.bottomY) <= 1) return; // yükseklikler örtüşmüyor
+        const edge = dir < 0 ? ro.x1 + ro.rt : ro.x0 - ro.lt, gap = dir*(edge - xh), oz = front(o);
+        if (gap < -1 || oz <= D) return; // menteşe tarafında değil ya da kapak komşunun önünde
+        const need = reach*Math.min(1, (oz - D)/sn); // çarpmamak için gereken en az boşluk
+        if (gap >= need - .5) return;
+        const y0 = Math.max(d.bottomY, od.bottomY), y1 = Math.min(d.topY, oy1);
+        out.push({x0: dir < 0 ? xh - need : xh, x1: dir < 0 ? xh : xh + need, y0, y1,
+          msg: `M${i + 1} ${doors.length > 1 ? (dr.R ? 'sağ ' : 'sol ') : ''}kapağı tam açılınca (${Math.round(ang*180/Math.PI)}°) M${j + 1} modülüne çarpar: aradaki boşluk ${cm(Math.max(0, gap))} cm, en az ${cm(Math.ceil(need/10)*10)} cm gerekir${!TYPES[m.type].pair ? ' ya da menteşe yönünü değiştirin' : ''}.`});
+      });
+    });
+  });
   return out;
 }
 function warnings(c = cfg){
@@ -2751,7 +2780,7 @@ function sideBazaNotch(c, m, x0, t, mx){
 }
 function buildSides(mx){
   const c = cfg, mat = c.sides.mat === 'body' ? panelMat(c.body.mat, c.body.color) : panelMat(c.front.mat, c.front.color, c.front.fin);
-  c.modules.forEach(m => ['left', 'right'].forEach(k => {
+  c.modules.forEach(m => ['left', 'right'].forEach(k => { // üst modül kapaması eviye hazne kesiminden etkilenmez (carve noBasin)
     const t = msT(m, k); if (!t) return;
     const {x0, y0, y1, depth: sd, floor} = sideGeom(c, m, k, mx);
     const g = new THREE.Group(); g.userData.side = k; g.userData.sideMod = m.uid; root.add(g);
@@ -2765,14 +2794,14 @@ function buildSides(mx){
     // baza bu kapamanın altından geçiyorsa (yan yana bazalı modüller arası) kapama baza yüksekliğine kadar kertilir
     const notch = sideBazaNotch(c, m, x0, t, mx);
     const cut = notch ? [Object.assign({x0: x0 - 1, x1: x0 + t + 1}, notch)] : [];
-    if (sideSingle(c, t)) carve(t, y1 - y0, sd, mat, x0 + t/2, (y0 + y1)/2, sd/2, g, cut); // tek plaka
+    if (sideSingle(c, t)) carve(t, y1 - y0, sd, mat, x0 + t/2, (y0 + y1)/2, sd/2, g, cut, false, isUpper(m)); // tek plaka
     else { // dönülerek yapılan profil (üstten kesit): ön yüz + dolaba dayalı bacak (+ dış bacak J/U)
       const shape = m.sides[k].shape || 'L', p = sidePlate(c, t, shape), H = y1 - y0, yc = (y0 + y1)/2, lg = sideLegs(shape, sd);
       const inX = k === 'left' ? x0 + t - p/2 : x0 + p/2, outX = k === 'left' ? x0 + p/2 : x0 + t - p/2; // dolap tarafı / dış taraf
       if (cut.length){ // baza kertiği olan kapamada (bazalı modüller arası) kertme için kutu parçalar
-        carve(t, H, p, mat, x0 + t/2, yc, sd - p/2, g, cut);                                    // ön yüz
-        carve(p, H, lg.in - p, mat, inX, yc, sd - p - (lg.in - p)/2, g, cut);                  // dolaba dayalı bacak
-        if (lg.out) carve(p, H, lg.out - p, mat, outX, yc, sd - p - (lg.out - p)/2, g, cut);   // dış bacak
+        carve(t, H, p, mat, x0 + t/2, yc, sd - p/2, g, cut, false, isUpper(m));                                    // ön yüz
+        carve(p, H, lg.in - p, mat, inX, yc, sd - p - (lg.in - p)/2, g, cut, false, isUpper(m));                  // dolaba dayalı bacak
+        if (lg.out) carve(p, H, lg.out - p, mat, outX, yc, sd - p - (lg.out - p)/2, g, cut, false, isUpper(m));   // dış bacak
       } else {
         // dönüşler 45° GÖNYE: üstten kesit çokgenleri, dikey çekilir. xo: dış kenar, xi: dolap tarafı kenar, d: dıştan içe yön
         const xo = k === 'left' ? x0 : x0 + t, xi = k === 'left' ? x0 + t : x0, d = Math.sign(xi - xo), zf = sd, zb = sd - p;
