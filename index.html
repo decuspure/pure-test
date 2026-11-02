@@ -398,6 +398,7 @@ const UPPER_GOLA = 26; // üst modülde gola: gövde altındaki profil yüksekli
 const UPPER_UP = 500; // ilk konulduğunda alt kenarı tezgah üstünden 50 cm yukarıda
 const UPPER_FRAME = 50; // camlı kapak çerçevesi (kullanıcı 2026-10-20: 5 cm); cam arkadan 8 mm lambaya oturur, 4 mm şeffaf temperli
 const upperGlass = m => isUpper(m) && !!layoutOf(m).glass;
+const frontLocked = m => !!m && (tallElcik(m) || upperGlass(m)); // kapağı HER ZAMAN DÜZ modüller: elcikli boy dolap, camlı üst modül (kullanıcı 2026-11-02 "çıtalı direkt seçilmesin camlıda")
 const TALL_SPLIT = .5; // iki kapak eşit yükseklikte (kapak arası boşluk gövde ortasında)
 /* B1 Çamaşır (kullanıcı kararı 2026-10-09): modülün altından ÜST KAPAĞIN ALTINA kadar HEP WASH_LOW (700 mm); gola ortası bunun 15 mm altında (kapak ile gola arası).
    Boy değişince yalnız üst kapak uzar / kısalır. Alt bölme: sepet 550 + ray / çerçeve / sürgülü üst kapak payı sığar */
@@ -924,7 +925,7 @@ const PABUC = 5;
 function sideGeom(c, m, k, mx){
   const r = mx.map[m.uid], t = msT(m, k), d = moduleDims(m, c), up = isUpper(m), floor = !up && !!(m.sides[k].full || onBase(m));
   return {t, floor, x0: k === 'left' ? r.x0 - t : r.x1, y0: floor ? PABUC : d.bottomY,
-    y1: isTall(m) || up ? d.topY : topH(c) - topT(c), depth: (isTall(m) || up ? modD(m) : c.depth) + (tallElcik(m) ? 0 : up && m.mirrorDoor ? 4 : sideFrontExtra(c)) + pushExtra(c, m)}; // elcikli modül düz kapaklı: kapama çıta payı almaz · üst modül (kullanıcı 2026-10-26): kendi boyunda ve derinliğinde, aynalı kapakta 4 mm ayna payı
+    y1: isTall(m) || up ? d.topY : topH(c) - topT(c), depth: (isTall(m) || up ? modD(m) : c.depth) + (frontLocked(m) ? 0 : up && m.mirrorDoor ? 4 : sideFrontExtra(c)) + pushExtra(c, m)}; // elcikli modül düz kapaklı: kapama çıta payı almaz · üst modül (kullanıcı 2026-10-26): kendi boyunda ve derinliğinde, aynalı kapakta 4 mm ayna payı
 }
 function sidesText(c){
   const p = []; (c.modules || []).forEach((m, i) => ['left', 'right'].forEach(k => { const t = msT(m, k); if (t) p.push(`M${i+1} ${k === 'left' ? 'sol' : 'sağ'} ${t} mm${m.sides[k].full ? ' (yere kadar)' : ''}`); }));
@@ -1262,22 +1263,9 @@ function cutList(c = cfg){
       if (upperGlass(m)){ // CAMLI KAPAK: TEK PARÇA çerçeve (kullanıcı 2026-10-20) — kapak plakasının ortası CNC ile boşaltılır, 5 cm çerçeve kalır; cam arkadan 8 mm lambada
         const F = UPPER_FRAME, gw = DW - 2*F + 16, gh = dH - 2*F + 16;
         (pair ? ['sol', 'sağ'] : [side]).forEach(k => { const lab = `Kapak (${pair ? k : 'tek'}) · camlı`;
-          push(lab, mod, 1, dH, DW, fT, fName, fKey, `menteşe ${k} · TEK PARÇA çerçeve: ortası CNC ile boşaltılır, ${F} mm çerçeve kalır (açıklık ${DW - 2*F} × ${dH - 2*F} mm) · iç kenarda arkadan 8 × 8 mm cam lambası · iç kenarlar da bantlı` + (c.front.style !== 'duz' ? ' · ' + frontStyleText(c.front) : '') + (fGrain('dikey') ? ' · ' + fGrain('dikey') : ''));
+          push(lab, mod, 1, dH, DW, fT, fName, fKey, `menteşe ${k} · TEK PARÇA çerçeve: ortası CNC ile boşaltılır, ${F} mm çerçeve kalır (açıklık ${DW - 2*F} × ${dH - 2*F} mm) · iç kenarda arkadan 8 × 8 mm cam lambası · iç kenarlar da bantlı · Düz kapak (camlı kapakta çıta olmaz)` + (fGrain('dikey') ? ' · ' + fGrain('dikey') : ''));
           rows[rows.length - 1].band = [4, 4]; // dış + iç kenarlar
           hw.push({item:`CNC iç boşaltma + cam lambası (${lab})`, mod, qty:1, price:0});
-          const tl = trimLayout(c.front, DW, dH); // kapak tipi camlıda da: çerçeve çıtası aynen; şerit çubuklar camın üstünden geçmez (çerçevede kısa parça)
-          if (tl && tl.kind === 'serit'){
-            const span = tl.vert ? DW : dH, inH = tl.ps.filter(p => p > F && p < span - F).length, nm = `${lab} çıtası · şerit ${tl.vert ? 'dikey' : 'yatay'}`, gn = fm.key === 'kaplama' ? ' · su yönü çubuk boyunca' : '';
-            const tm = fName.replace(/\d+ mm/, Math.round(tl.dep) + ' mm'), ends = Math.min(2, tl.n), mid = tl.n - ends - inH;
-            if (mid) push(nm, mod, mid, tl.len, tl.sw, Math.round(tl.dep), tm, fKey, `Ø${tl.sw} yarım yuvarlak · aralıksız · kapakla hemyüz · çerçeve üstünde tam boy` + gn);
-            push(nm + ' · uç', mod, ends, tl.len, tl.ew, Math.round(tl.dep), tm, fKey, `uç çubuk ${String(+tl.ew.toFixed(1)).replace('.', ',')} mm en · ${Math.round(tl.dep)} mm çıkıntı`);
-            if (inH) push(nm + ' · kısa (cam ' + (tl.vert ? 'üstü / altı' : 'yanları') + ')', mod, 2*inH, F - 10, tl.sw, Math.round(tl.dep), tm, fKey, `Ø${tl.sw} yarım yuvarlak · ${F} mm çerçeve üstünde, cam çevresi çıtasında biter` + gn);
-          } else trimRows(`${lab} çıtası`, mod, DW, dH);
-          if (tl){ // cam açıklığının çevresinde çıta (kullanıcı 2026-10-20): çerçeve tipinde aynı profil, şeritte oval; 10 × 8 mm, 45° gönye, açıklığın kenarında
-            const iw = DW - 2*F + 20, ih = dH - 2*F + 20, rnd = tl.kind === 'serit' || tl.round, nm2 = `${lab} · cam çevresi çıtası · ${rnd ? "oval" : "köşe"} profil`, tm2 = fName.replace(/\d+ mm/, '8 mm'), gn2 = fm.key === 'kaplama' ? ' · su yönü çıta boyunca' : '';
-            push(nm2, mod, 2, iw, 10, 8, tm2, fKey, 'cam açıklığının kenarında · 45° gönye · yatay' + gn2);
-            push(nm2, mod, 2, ih, 10, 8, tm2, fKey, 'cam açıklığının kenarında · 45° gönye · dikey' + gn2);
-          }
           hw.push({item:`Cam 4 mm şeffaf temperli (${lab}) · ${gw} × ${gh} mm · arkadan silikon / cam çıtası`, mod, qty:1, price: Math.round(gw*gh/1e6*PRICE.glassM2*100)/100}); });
       }
       else if (pair){ push('Kapak (sol)', mod, 1, dH, DW, fT, fName, fKey, 'menteşe sol' + st); push('Kapak (sağ)', mod, 1, dH, DW, fT, fName, fKey, 'menteşe sağ' + st); }
@@ -2587,7 +2575,7 @@ function buildUpper(m, x0){
       const gl = box(dw - 2*F + 16, y1 - y0 - 2*F + 16, 4, gm, sgn*dw/2, yc, -fT + 6, dg); gl.castShadow = false; gl.renderOrder = 3;
     } else grainDoor(box(dw, y1 - y0, fT, fm, sgn*dw/2, yc, -fT/2, dg), gFront(m) === 'v');
     if (m.mirrorDoor){ const mm = box(dw - 1, y1 - y0 - 1, 4, M.mirror, sgn*dw/2, (y0 + y1)/2, 2, dg); addEdges(mm, 30); } // aynalı kapak: önde 4 mm ayna (camlıda olmaz, normalize)
-    else frontTrim(dg, Math.min(0, sgn*dw), Math.max(0, sgn*dw), y0, y1, 0, fm, glass ? {x0: Math.min(0, sgn*dw) + F, x1: Math.max(0, sgn*dw) - F, y0: y0 + F, y1: y1 - F} : null); // kapak tipi camlıda da (kullanıcı 2026-10-20)
+    else if (!glass) frontTrim(dg, Math.min(0, sgn*dw), Math.max(0, sgn*dw), y0, y1, 0, fm); // camlı kapak her zaman düz (çıta yok)
     if (th === 'kulp'){ // açılış kenarında, kapağın alt ucunda dikey çubuk kulp
       const hl = 160, hx = sgn*(dw - (glass ? F/2 : 32)), hy = y0 + 40 + hl/2; // camlıda çerçeve dikmesinin ortasında
       const hh = cyl(6, hl, handleMat(m.handleColor), dg); hh.position.set(hx, hy, 22 + mz);
@@ -2716,10 +2704,8 @@ function drawerBox(dg, b){
   }
 }
 
-function frontTrim(dg, x0, x1, y0, y1, zf, mat, glassHole, force){ // glassHole: camlı kapağın açıklığı {x0, x1, y0, y1} — şerit çubuklar camın üstünden geçmez (çerçevede kısa parçalar)
-  const tl = trimLayout(force ? Object.assign({}, cfg.front, {style: force}) : cfg.front, x1 - x0, y1 - y0); if (!tl) return;
-  // camlı kapakta açıklığın çevresine de çıta (kullanıcı 2026-10-20): çerçeve tipinde aynı profil, şeritte oval; çıta açıklığın kenarında çerçevenin üstünde, şerit çubuklar bu çıtada biter
-  const GB = 10, inner = () => { if (glassHole && !force) frontTrim(dg, glassHole.x0 - GB, glassHole.x1 + GB, glassHole.y0 - GB, glassHole.y1 + GB, zf, mat, null, tl.kind === 'serit' ? 'oval' : cfg.front.style); };
+function frontTrim(dg, x0, x1, y0, y1, zf, mat){ // kapak tipi çıtası (çerçeve / şerit); elcikli ve camlı kapakta çağrılmaz (frontLocked)
+  const tl = trimLayout(cfg.front, x1 - x0, y1 - y0); if (!tl) return;
   if (tl.kind === 'serit'){
     // yarım yuvarlak çubuklar (boy başına tek geometri, çubuklarda tekrar kullanılır)
     const r = tl.sw/2, tile = (mat.userData && mat.userData.tile) || 0, geos = {};
@@ -2734,11 +2720,9 @@ function frontTrim(dg, x0, x1, y0, y1, zf, mat, glassHole, force){ // glassHole:
       dg.add(rod); };
     for (let i = 0; i < tl.n; i++){
       const p = (tl.vert ? x0 : y0) + tl.ps[i], sx = tl.ws[i]/tl.sw, a = tl.vert ? y0 : x0, b = tl.vert ? y1 : x1;
-      const inHole = glassHole && (tl.vert ? p > glassHole.x0 && p < glassHole.x1 : p > glassHole.y0 && p < glassHole.y1);
-      if (!inHole){ rodAt(p, a, b, sx); continue; }
-      const h0 = (tl.vert ? glassHole.y0 : glassHole.x0) - GB, h1 = (tl.vert ? glassHole.y1 : glassHole.x1) + GB; rodAt(p, a, h0, sx); rodAt(p, h1, b, sx); // camın iki yanındaki çerçevede kısa çubuk
+      rodAt(p, a, b, sx);
     }
-    inner(); return;
+    return;
   }
   // çerçeve çıtası: oval = yuvarlatılmış profil, köşe = keskin profil
   const bv = tl.round ? 3.5 : 0, ox0 = x0 + bv, ox1 = x1 - bv, oy0 = y0 + bv, oy1 = y1 - bv;
@@ -2767,7 +2751,6 @@ function frontTrim(dg, x0, x1, y0, y1, zf, mat, glassHole, force){ // glassHole:
     const pts = [[a, c, a + k, c + k], [b, c, b - k, c + k], [a, d, a + k, d - k], [b, d, b - k, d - k]].flatMap(q => [new THREE.Vector3(q[0], q[1], zt), new THREE.Vector3(q[2], q[3], zt)]);
     const ml = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), M.edge); ml.raycast = () => {}; dg.add(ml);
   }
-  inner();
 }
 /* kapamada baza kertiği: kapama bir baza koşusunun içinde kalıyorsa (bazalı iki modül arası) bazanın geçtiği bölge (alttan PLINTH,
    bazanın arka yüzünden öne kadar) kapamadan çıkarılır. Dönüş: {y0, y1, z0, z1} veya null */
@@ -3334,12 +3317,13 @@ function renderLeft(){
       <div class="sw">${sw('front', c.front.mat, c.front.color)}</div><div class="swname">${colorName(c.front.mat, c.front.color)} · ${matT(c.front.mat)} mm</div>
       ${c.front.mat === 'lake' ? '<p class="hint" style="margin:6px 0 0">Lake yüzey: ipek mat</p>' : ''}
       <div class="lbl" style="margin:12px 0 6px">Kapak tipi</div>
-      ${(() => { // elcikli modül seçiliyken kapak tipi pasif: yalnız düz (bu modülde kapak hep düz)
-        const selE = (c.modules.find(x => x.uid === ui.sel) || null), lockE = !!(selE && tallElcik(selE));
-        return `<div class="ftypes">${Object.entries(FRONT_STYLES).map(([k, v]) => `<button data-act="set" data-k="front.style" data-v="${k}" aria-pressed="${lockE ? k === 'duz' : c.front.style === k}" title="${lockE && k !== 'duz' ? 'Elcikli boy dolapta yalnız düz kapak' : v}"${lockE ? ' disabled style="opacity:' + (k === 'duz' ? 1 : .4) + ';cursor:not-allowed"' : ''}>${frontIcon(k)}<span>${v}</span></button>`).join('')}</div>`
-          + (lockE ? '<p class="hint" style="margin:6px 0 0">Elcikli boy dolapta yalnız düz kapak. Diğer modüllerin kapak tipini değiştirmek için başka bir modül seçin ya da seçimi kaldırın.</p>'
-            : c.modules.some(tallElcik) ? `<p class="hint" style="margin:6px 0 0">Elcikli boy dolapta kapak her zaman düz${c.front.style !== 'duz' ? '; seçilen kapak tipi diğer modüllere uygulanır' : ''}.</p>` : ''); })()}
-      ${c.front.style === 'serit' && !(c.modules.find(x => x.uid === ui.sel) && tallElcik(c.modules.find(x => x.uid === ui.sel))) ? `<div class="seg" style="margin-top:8px">${Object.entries(STRIP_DIR).map(([k, v]) => `<button data-act="set" data-k="front.stripDir" data-v="${k}" aria-pressed="${c.front.stripDir === k}">${v}</button>`).join('')}</div>` : ''}</section>
+      ${(() => { // kapağı hep düz modül (elcikli boy dolap, camlı üst modül) seçiliyken kapak tipi pasif: yalnız düz (frontLocked)
+        const selE = (c.modules.find(x => x.uid === ui.sel) || null), lockE = frontLocked(selE), lockN = lockE ? (upperGlass(selE) ? 'Camlı üst modülde' : 'Elcikli boy dolapta') : '';
+        const locked = [c.modules.some(tallElcik) && 'elcikli boy dolapta', c.modules.some(upperGlass) && 'camlı üst modülde'].filter(Boolean);
+        return `<div class="ftypes">${Object.entries(FRONT_STYLES).map(([k, v]) => `<button data-act="set" data-k="front.style" data-v="${k}" aria-pressed="${lockE ? k === 'duz' : c.front.style === k}" title="${lockE && k !== 'duz' ? lockN + ' yalnız düz kapak' : v}"${lockE ? ' disabled style="opacity:' + (k === 'duz' ? 1 : .4) + ';cursor:not-allowed"' : ''}>${frontIcon(k)}<span>${v}</span></button>`).join('')}</div>`
+          + (lockE ? `<p class="hint" style="margin:6px 0 0">${lockN} yalnız düz kapak (çıta olmaz). Diğer modüllerin kapak tipini değiştirmek için başka bir modül seçin ya da seçimi kaldırın.</p>`
+            : locked.length ? `<p class="hint" style="margin:6px 0 0">${locked.join(' ve ').replace(/^./, s => s.toUpperCase())} kapak her zaman düz${c.front.style !== 'duz' ? '; seçilen kapak tipi diğer modüllere uygulanır' : ''}.</p>` : ''); })()}
+      ${c.front.style === 'serit' && !frontLocked(c.modules.find(x => x.uid === ui.sel)) ? `<div class="seg" style="margin-top:8px">${Object.entries(STRIP_DIR).map(([k, v]) => `<button data-act="set" data-k="front.stripDir" data-v="${k}" aria-pressed="${c.front.stripDir === k}">${v}</button>`).join('')}</div>` : ''}</section>
     ${(() => { // tutamak seçili modüle göre: boy dolap seçiliyse onunki, değilse tezgah altı modüllerinki
       const sm = c.modules.find(x => x.uid === ui.sel), anyTall = c.modules.some(isTall);
       if (sm && tallElcik(sm)) return `<section><h2 class="sec">Kulp Tipi</h2><div class="swname">Elcik · tek tip</div><p class="hint" style="margin:6px 0 0">Elcikli boy dolapta (B2) elcik tek kapağın birleşim kenarında oyuk; hangi kapakta olacağı Modül panelinden (Sol / Sağ kapakta) seçilir. Kulp tipi seçimi yok.</p></section>`;
@@ -3484,7 +3468,7 @@ function renderRight(){
       <div class="seg"><button data-act="hinge" data-v="L" aria-pressed="${m.hinge === 'L'}">Soldan</button><button data-act="hinge" data-v="R" aria-pressed="${m.hinge !== 'L'}">Sağdan</button></div>`}
       <div class="lbl" style="margin:10px 0 6px">Kapak</div>
       <div class="seg">${LAYOUTS[m.type].map(l => `<button data-act="mset" data-k="layout" data-v="${l.id}" aria-pressed="${m.layout === l.id}">${l.glass ? 'Camlı' : 'Düz'}</button>`).join('')}</div>
-      ${upperGlass(m) ? `<p class="hint" style="margin:6px 0 0">${UPPER_FRAME/10} cm çerçeve (kapak malzemesi), 4 mm şeffaf temperli cam; kapak tipi (çıta) çerçeveye uygulanır (şerit çubuklar camın üstünden geçmez), ayna uygulanmaz.</p>`
+      ${upperGlass(m) ? `<p class="hint" style="margin:6px 0 0">${UPPER_FRAME/10} cm çerçeve (kapak malzemesi), 4 mm şeffaf temperli cam; kapak her zaman düz (çıta olmaz), ayna uygulanmaz.</p>`
         : `<label class="check" style="margin-top:10px"><input type="checkbox" id="m-mirror" data-m="mirrorDoor" ${m.mirrorDoor ? 'checked' : ''}>Aynalı kapak</label>`}
       <div class="field" style="margin-top:10px"><label for="m-x">Yatay konum (orta çizgi) <output>${m.x} mm</output></label><input type="range" id="m-x" min="-3000" max="3000" step="10" value="${m.x}" data-m="x"></div>
       <div class="field"><label for="m-bottom">Alt kenar yerden <output>${bottomY} mm</output></label><input type="range" id="m-bottom" min="0" max="${2400 - m.height}" step="10" value="${bottomY}" data-m="bottom"></div>
