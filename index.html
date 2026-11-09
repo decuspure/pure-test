@@ -716,16 +716,19 @@ const VESSEL = {D:430, H:130, wall:7}; // standart yuvarlak çanak: SABİT Ø430
    Ölçüler V&B ürün sayfasından; üstten biçim üreticinin 2D teknik çiziminden (DXF, 1:10): r = gider merkezinden her 10°'de dış kenar yarıçapı (mm;
    0° sağ, 90° arka / duvar tarafı). Kenar 10 mm, iç derinlik 115 mm; yan kesit çizimdeki gibi: dış duvar neredeyse dik, altta yuvarlak köşe, düz taban */
 const VESSELS = {
-  std:      {label:'Artis 43', code:'417943', W:430, D:430, H:130}, // V&B Artis yuvarlak tezgah üstü (kullanıcının gönderdiği çanak), beyaz,
-  '4A7240': {label:'Antao 40', W:400, D:395, H:145, r:[200,196,191,186,183,181,181,184,188,194,201,207,213,214,213,209,205,202,201,201,202,203,205,206,206,203,200,198,197,196,196,197,199,201,202,202]},
-  '4A7351': {label:'Antao 51', W:510, D:400, H:146, r:[255,245,228,210,196,186,181,180,183,189,201,214,227,239,248,253,255,256,256,254,250,243,235,226,217,209,203,200,200,203,207,215,225,238,249,256]},
-  '4A7465': {label:'Antao 65', W:650, D:400, H:146, minMod:700, r:[320,296,261,229,206,190,181,177,177,182,192,209,232,259,286,307,320,326,324,317,305,287,264,242,224,211,203,200,203,210,224,244,270,297,318,327]}
+  std:      {brand:'vb', label:'Artis 43', code:'417943', W:430, D:430, H:130, colors:['R1']}, // V&B Artis yuvarlak tezgah üstü (kullanıcının gönderdiği çanak), beyaz,
+  '4A7240': {brand:'vb', label:'Antao 40', W:400, D:395, H:145, r:[200,196,191,186,183,181,181,184,188,194,201,207,213,214,213,209,205,202,201,201,202,203,205,206,206,203,200,198,197,196,196,197,199,201,202,202]},
+  '4A7351': {brand:'vb', label:'Antao 51', W:510, D:400, H:146, r:[255,245,228,210,196,186,181,180,183,189,201,214,227,239,248,253,255,256,256,254,250,243,235,226,217,209,203,200,200,203,207,215,225,238,249,256]},
+  '4A7465': {brand:'vb', label:'Antao 65', W:650, D:400, H:146, minMod:700, r:[320,296,261,229,206,190,181,177,177,182,192,209,232,259,286,307,320,326,324,317,305,287,264,242,224,211,203,200,203,210,224,244,270,297,318,327]}
 };
 /* Antao renkleri (V&B CeramicPlus; ürün kodu = model + renk eki, ör. 4A7351R1): beyaz parlak, diğerleri mat */
 const ANTAO_COLORS = {R1:{name:'White Alpin', hex:'#f2f2ef', rough:.2}, RW:{name:'Stone White', hex:'#e2dfd8', rough:.72}, AM:{name:'Almond', hex:'#c2b19c', rough:.72}, R8:{name:'Morning Green', hex:'#9da690', rough:.72}, R7:{name:'Pure Black', hex:'#28282b', rough:.72}};
+/* ÇANAK MARKALARI (kullanıcı 2026-11-09): seçim sırası Marka → Model → Renk; şimdilik yalnız Villeroy & Boch, başka markalar buraya eklenir (VESSELS[..].brand). Renkler modele göre (colors; yoksa bütün ANTAO_COLORS) */
+const VESSEL_BRANDS = {vb:{name:'Villeroy & Boch'}};
+const vColors = s => vModel(s).colors || Object.keys(ANTAO_COLORS);
 const vModel = s => VESSELS[s && s.model] || VESSELS.std, isAntao = s => !!(s && s.type !== 'integrated' && VESSELS[s.model] && VESSELS[s.model].r);
 const vesselH = s => vModel(s).H; // çanak yüksekliği modele göre (std 130, Antao 145 / 146)
-const vesselName = s => isAntao(s) ? `Villeroy & Boch ${vModel(s).label} ${s.model}${s.color} · ${vModel(s).W} × ${vModel(s).D} × ${vModel(s).H} mm · ${ANTAO_COLORS[s.color].name}` : `Villeroy & Boch Artis 417943 · yuvarlak Ø${VESSEL.D} × ${VESSEL.H} mm · White Alpin`;
+const vesselName = s => isAntao(s) ? `${VESSEL_BRANDS[vModel(s).brand].name} ${vModel(s).label} ${s.model}${s.color} · ${vModel(s).W} × ${vModel(s).D} × ${vModel(s).H} mm · ${ANTAO_COLORS[s.color].name}` : `Villeroy & Boch Artis 417943 · yuvarlak Ø${VESSEL.D} × ${VESSEL.H} mm · White Alpin`;
 const SINK_DEPTH = 120; // porselen eviye hazne derinliği sabit 12 cm (kullanıcı 2026-10-23)
 const INT_MIN_W = 600; // porselen entegre eviye en az 60 cm modülde; daha darına yalnız çanak lavabo
 /* PORSELEN EVİYE EN FAZLA GENİŞLİK (kullanıcı 2026-10-23): 60 cm modülde 50, 70 cm'de 60; daha geniş modülde kenarlardan en az 10 cm (W − 200), 60'ın altına inmez (75 cm modül 55'e düşmesin) */
@@ -1078,7 +1081,7 @@ function normalize(c = cfg){
     if (!ids.has(s.module)) s.module = [...ids][0]; // modülü bulunamayan lavabo ilk tezgahlı modüle
     if (s.type === 'integrated' && !intAllowed(s.module, c)){ sinkDefaults(s, 'vessel_round'); narrow++; } // kural her kayıtta (sipariş, takım); bildirim yalnız açık tasarımda
     s.depth = SINK_DEPTH; // porselen eviye hazne derinliği SABİT 120 mm (kullanıcı 2026-10-23; eskiden 60–120 sürgü)
-    if (s.type !== 'integrated'){ s.type = 'vessel_round'; if (!VESSELS[s.model]) s.model = 'std'; { const mm = c.modules.find(x => x.uid === s.module), mn = vModel(s).minMod; if (mn && mm && mm.width < mn){ s.model = '4A7351'; if (c === cfg) toast(`Antao 65 en az ${mn/10} cm modüle konur; Antao 51 kondu`); } } if (isAntao(s) && !ANTAO_COLORS[s.color]) s.color = 'R1'; if (!isAntao(s)) delete s.color; s.w = vModel(s).W; s.d = vModel(s).D; delete s.vh; } // çanak modeli (std / Antao) ve Antao rengi
+    if (s.type !== 'integrated'){ s.type = 'vessel_round'; if (!VESSELS[s.model]) s.model = 'std'; { const mm = c.modules.find(x => x.uid === s.module), mn = vModel(s).minMod; if (mn && mm && mm.width < mn){ s.model = '4A7351'; if (c === cfg) toast(`Antao 65 en az ${mn/10} cm modüle konur; Antao 51 kondu`); } } s.brand = vModel(s).brand; if (isAntao(s) && !vColors(s).includes(s.color)) s.color = vColors(s)[0]; if (!isAntao(s)) delete s.color; s.w = vModel(s).W; s.d = vModel(s).D; delete s.vh; } // çanak modeli (std / Antao) ve Antao rengi
     else { s.w = clamp(Math.round(+s.w || 500), 400, intMaxW((c.modules.find(x => x.uid === s.module) || {}).width || 1200)); s.d = INT_D; if (!DRAINS[s.drain]) s.drain = 'zarf'; } // eksik/bozuk kayıtta gider tipi (parça listesinde "undefined" çıkmasın)
     const lim = sinkOffLim(s, c); s.offset = clamp(Math.round(+s.offset || 0), -lim, lim);
   });
@@ -3389,13 +3392,16 @@ function sinkEditor(s, mx){
     <div class="field"><label for="sk-mod-${id}">Modül</label><select id="sk-mod-${id}" data-s="${id}" data-f="module">${modOpts}</select></div>
     <div class="field"><label for="sk-off-${id}">Konum (modül merkezine göre) <output>${s.offset} mm</output></label><input type="range" id="sk-off-${id}" min="${-Math.floor(sinkOffLim(s))}" max="${Math.floor(sinkOffLim(s))}" step="5" value="${s.offset}" data-s="${id}" data-f="offset"${sinkOffLim(s) < 5 ? ' disabled' : ''}></div>
     ${vessel ? `
-    <div class="lbl" style="margin-bottom:6px">Model</div>
-    <div class="seg" style="margin-bottom:10px;flex-wrap:wrap">${Object.entries(VESSELS).map(([k, v]) => { const off = v.minMod && (cfg.modules.find(m => m.uid === s.module) || {}).width < v.minMod; // Antao 65 en az 70 cm modülde
+    <div class="lbl" style="margin-bottom:6px">1 · Marka</div>
+    <div class="seg" style="margin-bottom:10px;flex-wrap:wrap">${Object.entries(VESSEL_BRANDS).map(([k, b]) => `<button data-act="sink-brand" data-id="${id}" data-v="${k}" aria-pressed="${vModel(s).brand === k}">${b.name}</button>`).join('')}</div>
+    <div class="lbl" style="margin-bottom:6px">2 · Model</div>
+    <div class="seg" style="margin-bottom:10px;flex-wrap:wrap">${Object.entries(VESSELS).filter(([, v]) => v.brand === vModel(s).brand).map(([k, v]) => { const off = v.minMod && (cfg.modules.find(m => m.uid === s.module) || {}).width < v.minMod; // Antao 65 en az 70 cm modülde
       return `<button data-act="sink-f" data-id="${id}" data-f="model" data-v="${k}" aria-pressed="${vModel(s) === v}"${off ? ` disabled title="En az ${v.minMod/10} cm modüle konur"` : ''}>${v.label}</button>`; }).join('')}</div>
-    ${Object.values(VESSELS).some(v => v.minMod && (cfg.modules.find(m => m.uid === s.module) || {}).width < v.minMod) ? `<p class="hint" style="margin:-4px 0 10px">Antao 65 en az 70 cm modüle konur.</p>` : ''}
-    ${isAntao(s) ? `<div class="lbl" style="margin-bottom:6px">Renk</div>
-    <div class="sw">${Object.entries(ANTAO_COLORS).map(([k, v]) => `<button data-act="sink-f" data-id="${id}" data-f="color" data-v="${k}" aria-pressed="${s.color === k}" title="${v.name}" style="background:${v.hex}"></button>`).join('')}</div>
-    <div class="swname">${ANTAO_COLORS[s.color].name}</div>` : ''}
+    ${Object.values(VESSELS).some(v => v.brand === vModel(s).brand && v.minMod && (cfg.modules.find(m => m.uid === s.module) || {}).width < v.minMod) ? `<p class="hint" style="margin:-4px 0 10px">Antao 65 en az 70 cm modüle konur.</p>` : ''}
+    <div class="lbl" style="margin-bottom:6px">3 · Renk</div>
+    ${(() => { const cols = vColors(s), cur = isAntao(s) ? s.color : cols[0]; // tek renkli modelde (Artis) renk sabit, seçili görünür
+      return `<div class="sw">${cols.map(k => `<button data-act="sink-f" data-id="${id}" data-f="color" data-v="${k}" aria-pressed="${cur === k}" title="${ANTAO_COLORS[k].name}" style="background:${ANTAO_COLORS[k].hex}"${cols.length < 2 ? ' disabled' : ''}></button>`).join('')}</div>
+    <div class="swname">${ANTAO_COLORS[cur].name}${cols.length < 2 ? ' · bu modelde tek renk' : ''}</div>`; })()}
     <p class="hint" style="margin:0 0 10px">${vesselName(s)} · tezgah üstü ${String(topH()/10).replace('.', ',')} cm, çanak üst kotu ${String((topH() + vesselH(s))/10).replace('.', ',')} cm</p>` : `
     <div class="field"><label for="sk-w-${id}">Genişlik <span class="muted">en fazla ${intMaxW((cfg.modules.find(x => x.uid === s.module) || {}).width || 1200)/10} cm</span></label><select id="sk-w-${id}" data-s="${id}" data-f="w">${(() => { // açılır liste (kullanıcı 2026-10-23; eskiden sürgü): 40–120 cm, 5 cm adım; kayıtlı ara değer de listede kalır
       const mw = intMaxW((cfg.modules.find(x => x.uid === s.module) || {}).width || 1200), o = []; for (let v = 400; v <= mw; v += 50) o.push(v); if (!o.includes(s.w)) o.push(s.w); return o.sort((a, b) => a - b).map(v => `<option value="${v}" ${v === s.w ? 'selected' : ''}>${+(v/10).toFixed(1)} cm</option>`).join(''); })()}</select></div>
@@ -3828,6 +3834,7 @@ document.addEventListener('click', e => {
     case 'sel-sink': ui.selSink = b.dataset.id; renderRight(); break;
     case 'del-sink': cfg.sinks = cfg.sinks.filter(s => s.uid !== b.dataset.id); if (ui.selSink === b.dataset.id) ui.selSink = cfg.sinks[0]?.uid || null; refresh({left:false}); break;
     case 'sink-f': { const s = cfg.sinks.find(x => x.uid === b.dataset.id); s[b.dataset.f] = b.dataset.v; refresh({left:false}); break; }
+    case 'sink-brand': { const s = cfg.sinks.find(x => x.uid === b.dataset.id); if (vModel(s).brand !== b.dataset.v){ s.model = Object.keys(VESSELS).find(k => VESSELS[k].brand === b.dataset.v); delete s.color; } refresh({left:false}); break; } // marka değişince o markanın ilk modeli
     case 'mirror-shape': {
       const ms = cfg.mirrors.find(x => x.uid === ui.selMirror), shape = b.dataset.v;
       if (!ms){ addMirror(shape, selCenter()); break; }
