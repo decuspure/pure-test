@@ -363,6 +363,7 @@ dialog::backdrop{background:rgba(10,14,13,.45)}
 const TOP_STD = 900; // tezgah üstü 90 cm (yere basan / bazalı modül yoksa her zaman)
 let TOTAL_H = TOP_STD;
 const PLINTH = 100, DEPTH_MIN = 500, DEPTH_MAX = 500; // derinlik 50 cm sabit
+const dispH = (m, c = cfg) => moduleDims(m, c).H + (TYPES[m.type].base ? PLINTH : 0); // GÖSTERİLEN yükseklik: bazalı (C3) modülde baza dahil (C3-75 → 75; kullanıcı 2026-11-10), gövde hesapları moduleDims().H
 const TOP_T = [6,30,80,120]; // tezgah kalınlıkları (kullanıcı 2026-10-22; 12 mm kaldırıldı)
 const W_MIN = 300, W_MAX = 1200, W_STEP = 50; // tezgah altı modül genişliği mm (C1, C2, C3 hepsi 30–120 cm; kullanıcı kararı), 5 cm adım
 const wMax = m => (TYPES[m.type] && TYPES[m.type].Wmax) || W_MAX; // tipe göre üst sınır (boy dolaplar kendi Wmax'ı; tezgah altı W_MAX)
@@ -396,7 +397,12 @@ const modD = m => tallDepthAdj(m) && m.depth ? m.depth : TYPES[m.type].D;
 const isUpper = m => !!(m && TYPES[m.type] && TYPES[m.type].upper); // U1 / U2 üst modül
 const UPPER_GOLA = 26; // üst modülde gola: gövde altındaki profil yüksekliği (kapak bunu örter, parmak kapağın alt kenarından girer)
 const UPPER_UP = 500; // ilk konulduğunda alt kenarı tezgah üstünden 50 cm yukarıda
+const UPPER_XMAX = 5000; // üst modül yatay konumu (orta çizgi) ± bu kadar mm: normalize, Modül paneli sürgüsü ve Modül Konumu kutusu aynı sınırı kullanır (tam tarama 2026-11-10)
 const UPPER_FRAME = 50; // camlı kapak çerçevesi (kullanıcı 2026-10-20: 5 cm); cam arkadan 8 mm lambaya oturur, 4 mm şeffaf temperli
+const ALU_FRAME = 20; // ALÜMİNYUM ÇERÇEVELİ CAM KAPAK (kullanıcı 2026-11-10): camlı üst modülde Malzeme > Kapak tipi'nden modüle özel seçilir (m.glassFrame 'alu'); mat siyah alüminyum profil 20 mm, 4 mm füme cam
+const ALU_BACK = 45, ALU_FRONT_D = 8; // alüminyum profilin ARKA kanadı 45 mm (menteşe kabı Ø35, kenardan 22,5 mm oturur; kullanıcı 2026-11-10 "iç kısımda çerçeve daha kalın, menteşeyi kurtaracak"), öndeki 20 mm kademe 8 mm derin
+const aluGlass = m => upperGlass(m) && m.glassFrame === 'alu';
+const glassFrameW = m => aluGlass(m) ? ALU_FRAME : UPPER_FRAME; // görünen çerçeve eni
 const upperGlass = m => isUpper(m) && !!layoutOf(m).glass;
 const frontLocked = m => !!m && (tallElcik(m) || upperGlass(m)); // kapağı HER ZAMAN DÜZ modüller: elcikli boy dolap, camlı üst modül (kullanıcı 2026-11-02 "çıtalı direkt seçilmesin camlıda")
 const TALL_SPLIT = .5; // iki kapak eşit yükseklikte (kapak arası boşluk gövde ortasında)
@@ -546,6 +552,7 @@ function tallInterior(m, c = cfg){
     const sb = top + IDR_GAP; // sabit rafın alt yüzü
     return out([{y: sb + T/2}], [[sb + T, H - T, shelfN(H - T - sb - T)]]); // çekmece varken orta raf yok: üstteki raflar eşit aralıklı
   }
+  if (tallPantry(m)) return out([], []); // kiler (VS TAL Gate): raf yok — menteşeler hayali raflardan kaçmasın (tam tarama 2026-11-10)
   if (pair) return out([], [[T, H - T, shelfN(H - 2*T)]]);
   if (tallWash(m)) return out([{y: mid, mid: true}], [[mid + T/2, H - T, shelfN(H - T - mid - T/2)]]); // çamaşır: alt bölme sepet (raf yok), üstte eşit aralıklı ayarlı raflar
   // B1 çekmecesiz (tek ya da iki kapak): SABİT RAF YOK, ortadaki dahil bütün raflar AYARLI, pimli ve eşit aralıklı (tek kapak 2026-10-12;
@@ -554,6 +561,7 @@ function tallInterior(m, c = cfg){
   return out([], [[T, H - T, 2*nh + 1]]);
 }
 const tallHandleOf = (m, c = cfg) => tallElcik(m) ? 'elcik' : tallGolaOnly(m) ? 'kanal' : tallNoGola(m) && m.handle === 'kanal' ? 'push' : (m.handle || c.handle); // boy dolapta tutamak modüle özel (m.handle)
+const moveOff = (c, i, d) => { const j = i + d; return j < 0 || j >= c.modules.length || isUpper(c.modules[i]) || isUpper(c.modules[j]); }; // Sola / Sağa pasif: dizilimin ucu ya da üst modül (boy dolap araya girebilir; tam tarama 2026-11-10)
 const partsTxt = (L, sep = ' · ') => L.doors ? (L.id === 'u1' ? 'tek kapak · raflı' : L.id === 'u1g' ? 'camlı kapak · 5 cm çerçeve · raflı' : L.id === 'u2g' ? 'sol · sağ camlı kapak · 5 cm çerçeve · raflı' : L.id === 'u2' ? 'sol · sağ kapak · raflı' : L.id === 'k1' ? 'tek boy kapak' : L.id === 'kg' ? 'tek kapak · VS TAL Gate Planero' : L.id === 'kw' ? 'çamaşır sepeti · gola · raflı kapak' : L.id === 'kc' ? 'sol · sağ kapak · gola' : L.id === 'ke' ? 'sol · sağ kapak · elcik' : 'üst · alt kapak') : L.parts.map(p => p === 'R' ? 'alt' : p === 'E' ? 'eşit' : p).join(sep);
 /* eski tipler (Askı 30/45/60): askı kalır — 1 çekmece C1, 2+ çekmece C2-60; eski bazalı 'Boy' (floor) C3-85 */
 const OLD_PARTS = {w30:{'1':1,'2':2}, w45:{'1':1,'2':2,'3':3,'2d':2}, w60:{'1':1,'2':2,'3':3,'4':4,'3d':3,'2d':2}};
@@ -762,7 +770,7 @@ const STATUSES = [
   {id:'sevk', label:'Sevkiyata hazır'},
   {id:'teslim', label:'Teslim edildi'}
 ];
-/* örnek birim fiyatlar (€) — gerçek fiyat listesi sonra girilecek */
+/* birim fiyatlar (€, SATIŞ): çoğu gerçek (2026-10-12’den beri); tezgah, entegre eviye ve gider, ayna, cam, lake boyası / işçiliği örnek; çubuk kulp geçici; 0 olanlar sonra girilecek */
 const PRICE = {
   m2:{kaplama19:144, kaplama9:96.68, lam18:37.17, lam9:26.51}, // satış €/m² (kaplama, lam; lam9 = 8 mm plaka); lake m² PRICE.lake bileşenlerinden (lakeM2)
   // LAKE (kullanıcı 2026-10-26): ham MDF + iki yüz × (astar + tiner + boya + boya işçiliği), €/m² (boyalı 1 m² için); boya (renge göre) ve işçilik henüz verilmedi (0)
@@ -778,7 +786,7 @@ const PRICE = {
   sink:{integrated:195}, // entegre eviye ÖRNEK
   // çanak lavabo satış € (kullanıcı 2026-10-26): Artis tek renk; Antao beyaz (R1) ve mat renkler (RW, AM, R8, R7) ayrı
   vessel:{std:554.56, '4A7240':{R1:638.45, mat:748.235}, '4A7351':{R1:688.715, mat:809.64}, '4A7465':{R1:752.015, mat:885.22}}, drain:{gizli:50, rampa:44, zarf:68}, // batarya SATILMAZ (kullanıcı 2026-10-26): fiyatta ve listelerde batarya kalemi yok; 3B'de yalnız görsel
-  mirrorM2:76, glassM2:45 /* camlı kapak camı 4 mm temperli, ÖRNEK */, mirrorBase:18, mirrorShape:{organik:1.4}, vat:.20,
+  mirrorM2:76, glassM2:45 /* camlı kapak camı 4 mm temperli, ÖRNEK */, aluDoor:0 /* alüminyum çerçeveli füme cam kapak, adet — fiyat sonra girilecek (kullanıcı 2026-11-10) */, mirrorBase:18, mirrorShape:{organik:1.4}, vat:.20,
   // AYNA LED (kullanıcı 2026-10-26, satış €): sabit boy Flex LED (cm → €), arka çerçeve çevresine göre bir üst boy; 500 cm üstü 500 + kalan, birden çok parçada çoklayıcı; ayna başına 1 trafo 5 A 12 V
   ledStrip:{75:16.48, 100:20.6, 125:24.76, 150:28.88, 200:33, 250:45.36, 300:57.72, 400:70.12, 500:82.48}, ledSplit:{3:14.84, 6:18.16}, ledDriver:20 /* 5 A 12 V */,
   bandM:{kaplama:1, lam:0.478}, // kenar bandı satış €/m (bant enine göre fark yok); lake kenarları boyalı, bant yok
@@ -843,7 +851,7 @@ try {
 } catch (e) {}
 /* KATALOG TAKIMLARI (2026-10-14, katalog QR kodları): ?takim=set1 … set7 o takımı açar (katalog/capture.js KAT.SETS, normalize edilmiş).
    Kayıtlı taslak "Önceki tasarımım" yedeğine alınır (açılış sürümü gibi); adres çubuğundaki ?takim sonra silinir — sayfa yenilenince kişinin değişiklikleri kalır */
-const TAKIMLAR = {"set1":{"name":"Fluted","cfg":{"depth":500,"top":{"on":true,"t":12,"color":"titanium","surf":"mat"},"body":{"mat":"kaplama","color":"mese"},"front":{"mat":"kaplama","color":"mese","fin":"ipek","style":"serit","stripDir":"dikey"},"handle":"kanal","handleColor":"krom","kanalFin":"front","modules":[{"uid":"k1","type":"c1_30","layout":"1","width":600,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"}}},{"uid":"k2","type":"c1_30","layout":"1","width":400,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"}}},{"uid":"k3","type":"b1","layout":"k2","width":300,"hidden":false,"org":{},"sides":{"left":{"on":true,"t":9,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":true,"t":9,"full":false,"mat":"kaplama","shape":"L"}},"hinge":"R","bottom":590,"height":1200,"handle":"kanal","handleColor":"krom","kanalFin":"front","idr":[]}],"sinks":[{"uid":"k4","type":"integrated","module":"k1","offset":0,"depth":80,"drain":"rampa","w":500,"faucet":"deliksiz","d":300}],"mirrors":[{"uid":"k85","shape":"dikdortgen","w":600,"h":800,"x":-409,"bottom":1120,"led":true}],"sides":{"mat":"front"}}},"set2":{"name":"Beige","cfg":{"depth":500,"top":{"on":true,"t":12,"color":"viola","surf":"mat"},"body":{"mat":"lam","color":"dcsgcb"},"front":{"mat":"lake","color":"dcs02","fin":"ipek","style":"duz","stripDir":"dikey"},"handle":"kanal","handleColor":"krom","kanalFin":"alu","modules":[{"uid":"k5","type":"c1_40","layout":"1","width":800,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":18,"full":false,"mat":"lam","shape":"L"},"right":{"on":false,"t":18,"full":false,"mat":"lam","shape":"L"}}}],"sinks":[{"uid":"k6","type":"vessel_round","module":"k5","offset":0,"depth":80,"drain":"zarf","model":"4A7351","color":"R1","w":510,"d":400,"faucet":"delikli"}],"mirrors":[{"uid":"k86","shape":"yuvarlak","w":700,"h":700,"x":0,"bottom":1150,"led":true}],"sides":{"mat":"front"}}},"set3":{"name":"Walnut","cfg":{"depth":500,"top":{"on":true,"t":12,"color":"forge","surf":"mat"},"body":{"mat":"kaplama","color":"ceviz"},"front":{"mat":"kaplama","color":"ceviz","fin":"ipek","style":"duz","stripDir":"dikey"},"handle":"push","handleColor":"krom","kanalFin":"alu","modules":[{"uid":"k7","type":"c2_60","layout":"2","width":1000,"hidden":false,"org":{},"sides":{"left":{"on":true,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":true,"t":19,"full":false,"mat":"kaplama","shape":"L"}}}],"sinks":[{"uid":"k8","type":"integrated","module":"k7","offset":0,"depth":80,"drain":"gizli","w":600,"faucet":"deliksiz","d":300}],"mirrors":[{"uid":"k87","shape":"dikdortgen","w":900,"h":700,"x":0,"bottom":1120,"led":true}],"sides":{"mat":"front"}}},"set4":{"name":"Twin","cfg":{"depth":500,"top":{"on":true,"t":12,"color":"picasso","surf":"mat"},"body":{"mat":"lake","color":"dcsn16"},"front":{"mat":"lake","color":"dcsn16","fin":"mat","style":"duz","stripDir":"dikey"},"handle":"kulp","handleColor":"bronz","kanalFin":"alu","modules":[{"uid":"k9","type":"c3_75","layout":"3","width":600,"hidden":false,"org":{},"sides":{"left":{"on":true,"t":18,"full":true,"mat":"lake","shape":"L"},"right":{"on":false,"t":18,"full":true,"mat":"lake","shape":"L"}}},{"uid":"k10","type":"c3_75","layout":"3","width":600,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":18,"full":true,"mat":"lake","shape":"L"},"right":{"on":true,"t":18,"full":true,"mat":"lake","shape":"L"}}}],"sinks":[{"uid":"k11","type":"vessel_round","module":"k9","offset":0,"depth":80,"drain":"zarf","model":"std","w":430,"d":430,"faucet":"delikli"},{"uid":"k12","type":"vessel_round","module":"k10","offset":0,"depth":80,"drain":"zarf","model":"std","w":430,"d":430,"faucet":"delikli"}],"mirrors":[{"uid":"k88","shape":"yuvarlak","w":500,"h":500,"x":-300,"bottom":1350,"led":true},{"uid":"k89","shape":"yuvarlak","w":500,"h":500,"x":300,"bottom":1350,"led":true}],"sides":{"mat":"front"}}},"set5":{"name":"Smoke","cfg":{"depth":500,"top":{"on":true,"t":12,"color":"macchia","surf":"mat"},"body":{"mat":"kaplama","color":"fumese"},"front":{"mat":"kaplama","color":"fumese","fin":"ipek","style":"oval","stripDir":"dikey"},"handle":"kulp","handleColor":"gold","kanalFin":"alu","modules":[{"uid":"k13","type":"c1_30","layout":"1","width":1000,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"}}},{"uid":"k14","type":"b1","layout":"k1","width":400,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"}},"hinge":"R","bottom":400,"height":1500,"handle":"kulp","handleColor":"gold","kanalFin":"alu","idr":[]}],"sinks":[{"uid":"k15","type":"vessel_round","module":"k13","offset":0,"depth":80,"drain":"zarf","model":"4A7465","color":"AM","w":650,"d":400,"faucet":"delikli"}],"mirrors":[{"uid":"k90","shape":"organik","w":800,"h":790,"x":-250,"bottom":1150,"led":true}],"sides":{"mat":"front"}}},"set6":{"name":"Linen","cfg":{"depth":500,"top":{"on":true,"t":12,"color":"crosscut","surf":"mat"},"body":{"mat":"kaplama","color":"agmese"},"front":{"mat":"kaplama","color":"agmese","fin":"ipek","style":"duz","stripDir":"dikey"},"handle":"kanal","handleColor":"krom","kanalFin":"front","modules":[{"uid":"k17","type":"b1w","layout":"kw","width":450,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"}},"height":1500,"bottom":400,"handle":"kanal","handleColor":"krom","kanalFin":"front","hinge":"L","idr":[]},{"uid":"k16","type":"c2_60","layout":"2","width":800,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"}}},{"uid":"k18","type":"b2","layout":"ke","width":600,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"}},"height":1500,"bottom":400,"elcikSide":"R","handle":"elcik","handleColor":"krom","kanalFin":"front","hinge":"R","idr":[],"elcikY":880}],"sinks":[{"uid":"k19","type":"vessel_round","module":"k16","offset":0,"depth":80,"drain":"zarf","model":"4A7240","color":"RW","w":400,"d":395,"faucet":"delikli"}],"mirrors":[{"uid":"k91","shape":"organik","w":600,"h":590,"x":-75,"bottom":1150,"led":true}],"sides":{"mat":"front"}}},"set7":{"name":"Night","cfg":{"depth":500,"top":{"on":true,"t":12,"color":"forge","surf":"mat"},"body":{"mat":"lam","color":"dcsgs"},"front":{"mat":"lam","color":"dcsgs","fin":"ipek","style":"duz","stripDir":"dikey"},"handle":"kanal","handleColor":"krom","kanalFin":"alu","modules":[{"uid":"k20","type":"c1_40","layout":"1","width":1200,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":18,"full":false,"mat":"lam","shape":"L"},"right":{"on":false,"t":18,"full":false,"mat":"lam","shape":"L"}}},{"uid":"k21","type":"b2","layout":"kc","width":800,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":18,"full":false,"mat":"lam","shape":"L"},"right":{"on":false,"t":18,"full":false,"mat":"lam","shape":"L"}},"height":1200,"bottom":590,"handle":"kanal","handleColor":"krom","kanalFin":"alu","hinge":"R","idr":[]}],"sinks":[{"uid":"k22","type":"integrated","module":"k20","offset":0,"depth":80,"drain":"zarf","w":800,"faucet":"deliksiz","d":300}],"mirrors":[{"uid":"k92","shape":"organik","w":850,"h":835,"x":-450,"bottom":1120,"led":true}],"sides":{"mat":"front"}}}};
+const TAKIMLAR = {"set1":{"name":"Fluted","cfg":{"depth":500,"top":{"on":true,"t":12,"color":"titanium","surf":"mat"},"body":{"mat":"kaplama","color":"mese"},"front":{"mat":"kaplama","color":"mese","fin":"ipek","style":"serit","stripDir":"dikey"},"handle":"kanal","handleColor":"krom","kanalFin":"front","modules":[{"uid":"k1","type":"c1_30","layout":"1","width":600,"hidden":false,"org":{},"sides":{"left":{"on":true,"t":9,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"}}},{"uid":"k2","type":"c1_30","layout":"1","width":400,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":true,"t":9,"full":false,"mat":"kaplama","shape":"L"}}},{"uid":"k3","type":"b1","layout":"k2","width":300,"hidden":false,"org":{},"sides":{"left":{"on":true,"t":9,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":true,"t":9,"full":false,"mat":"kaplama","shape":"L"}},"hinge":"R","bottom":590,"height":1200,"handle":"kanal","handleColor":"krom","kanalFin":"front","idr":[]}],"sinks":[{"uid":"k4","type":"integrated","module":"k1","offset":0,"depth":80,"drain":"rampa","w":500,"faucet":"deliksiz","d":300}],"mirrors":[{"uid":"k85","shape":"dikdortgen","w":600,"h":800,"x":-409,"bottom":1120,"led":true}],"sides":{"mat":"front"}}},"set2":{"name":"Beige","cfg":{"depth":500,"top":{"on":true,"t":12,"color":"viola","surf":"mat"},"body":{"mat":"lam","color":"dcsgcb"},"front":{"mat":"lake","color":"dcs02","fin":"ipek","style":"duz","stripDir":"dikey"},"handle":"kanal","handleColor":"krom","kanalFin":"alu","modules":[{"uid":"k5","type":"c1_40","layout":"1","width":800,"hidden":false,"org":{},"sides":{"left":{"on":true,"t":18,"full":false,"mat":"lake","shape":"L"},"right":{"on":true,"t":18,"full":false,"mat":"lake","shape":"L"}}}],"sinks":[{"uid":"k6","type":"vessel_round","module":"k5","offset":0,"depth":80,"drain":"zarf","model":"4A7351","color":"R1","w":510,"d":400,"faucet":"delikli"}],"mirrors":[{"uid":"k86","shape":"yuvarlak","w":700,"h":700,"x":0,"bottom":1150,"led":true}],"sides":{"mat":"front"}}},"set3":{"name":"Walnut","cfg":{"depth":500,"top":{"on":true,"t":12,"color":"forge","surf":"mat"},"body":{"mat":"kaplama","color":"ceviz"},"front":{"mat":"kaplama","color":"ceviz","fin":"ipek","style":"duz","stripDir":"dikey"},"handle":"push","handleColor":"krom","kanalFin":"alu","modules":[{"uid":"k7","type":"c2_60","layout":"2","width":1000,"hidden":false,"org":{},"sides":{"left":{"on":true,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":true,"t":19,"full":false,"mat":"kaplama","shape":"L"}}}],"sinks":[{"uid":"k8","type":"integrated","module":"k7","offset":0,"depth":80,"drain":"gizli","w":600,"faucet":"deliksiz","d":300}],"mirrors":[{"uid":"k87","shape":"dikdortgen","w":900,"h":700,"x":0,"bottom":1120,"led":true}],"sides":{"mat":"front"}}},"set4":{"name":"Twin","cfg":{"depth":500,"top":{"on":true,"t":12,"color":"picasso","surf":"mat"},"body":{"mat":"lake","color":"dcsn16"},"front":{"mat":"lake","color":"dcsn16","fin":"mat","style":"duz","stripDir":"dikey"},"handle":"kulp","handleColor":"bronz","kanalFin":"alu","modules":[{"uid":"k9","type":"c3_75","layout":"3","width":600,"hidden":false,"org":{},"sides":{"left":{"on":true,"t":18,"full":true,"mat":"lake","shape":"L"},"right":{"on":false,"t":18,"full":true,"mat":"lake","shape":"L"}}},{"uid":"k10","type":"c3_75","layout":"3","width":600,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":18,"full":true,"mat":"lake","shape":"L"},"right":{"on":true,"t":18,"full":true,"mat":"lake","shape":"L"}}}],"sinks":[{"uid":"k11","type":"vessel_round","module":"k9","offset":0,"depth":80,"drain":"zarf","model":"std","w":430,"d":430,"faucet":"delikli"},{"uid":"k12","type":"vessel_round","module":"k10","offset":0,"depth":80,"drain":"zarf","model":"std","w":430,"d":430,"faucet":"delikli"}],"mirrors":[{"uid":"k88","shape":"yuvarlak","w":500,"h":500,"x":-300,"bottom":1350,"led":true},{"uid":"k89","shape":"yuvarlak","w":500,"h":500,"x":300,"bottom":1350,"led":true}],"sides":{"mat":"front"}}},"set5":{"name":"Smoke","cfg":{"depth":500,"top":{"on":true,"t":12,"color":"macchia","surf":"mat"},"body":{"mat":"kaplama","color":"fumese"},"front":{"mat":"kaplama","color":"fumese","fin":"ipek","style":"oval","stripDir":"dikey"},"handle":"kulp","handleColor":"gold","kanalFin":"alu","modules":[{"uid":"k13","type":"c1_30","layout":"1","width":1000,"hidden":false,"org":{},"sides":{"left":{"on":true,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":true,"t":19,"full":false,"mat":"kaplama","shape":"L"}}},{"uid":"k14","type":"b1","layout":"k1","width":400,"hidden":false,"org":{},"sides":{"left":{"on":true,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":true,"t":19,"full":false,"mat":"kaplama","shape":"L"}},"hinge":"R","bottom":400,"height":1500,"handle":"kulp","handleColor":"gold","kanalFin":"alu","idr":[]}],"sinks":[{"uid":"k15","type":"vessel_round","module":"k13","offset":0,"depth":80,"drain":"zarf","model":"4A7465","color":"AM","w":650,"d":400,"faucet":"delikli"}],"mirrors":[{"uid":"k90","shape":"organik","w":800,"h":790,"x":-269,"bottom":1150,"led":true}],"sides":{"mat":"front"}}},"set6":{"name":"Linen","cfg":{"depth":500,"top":{"on":true,"t":12,"color":"crosscut","surf":"mat"},"body":{"mat":"kaplama","color":"agmese"},"front":{"mat":"kaplama","color":"agmese","fin":"ipek","style":"duz","stripDir":"dikey"},"handle":"kanal","handleColor":"krom","kanalFin":"front","modules":[{"uid":"k17","type":"b1w","layout":"kw","width":450,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"}},"height":1500,"bottom":400,"handle":"kanal","handleColor":"krom","kanalFin":"front","hinge":"L","idr":[]},{"uid":"k16","type":"c2_60","layout":"2","width":800,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"}}},{"uid":"k18","type":"b2","layout":"ke","width":600,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"},"right":{"on":false,"t":19,"full":false,"mat":"kaplama","shape":"L"}},"height":1500,"bottom":400,"elcikSide":"R","handle":"elcik","handleColor":"krom","kanalFin":"front","hinge":"R","idr":[],"elcikY":880}],"sinks":[{"uid":"k19","type":"vessel_round","module":"k16","offset":0,"depth":80,"drain":"zarf","model":"4A7240","color":"RW","w":400,"d":395,"faucet":"delikli"}],"mirrors":[{"uid":"k91","shape":"organik","w":600,"h":590,"x":-75,"bottom":1150,"led":true}],"sides":{"mat":"front"}}},"set7":{"name":"Night","cfg":{"depth":500,"top":{"on":true,"t":12,"color":"forge","surf":"mat"},"body":{"mat":"lam","color":"dcsgs"},"front":{"mat":"lam","color":"dcsgs","fin":"ipek","style":"duz","stripDir":"dikey"},"handle":"kanal","handleColor":"krom","kanalFin":"alu","modules":[{"uid":"k20","type":"c1_40","layout":"1","width":1200,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":18,"full":false,"mat":"lam","shape":"L"},"right":{"on":false,"t":18,"full":false,"mat":"lam","shape":"L"}}},{"uid":"k21","type":"b2","layout":"kc","width":800,"hidden":false,"org":{},"sides":{"left":{"on":false,"t":18,"full":false,"mat":"lam","shape":"L"},"right":{"on":false,"t":18,"full":false,"mat":"lam","shape":"L"}},"height":1200,"bottom":590,"handle":"kanal","handleColor":"krom","kanalFin":"alu","hinge":"R","idr":[]}],"sinks":[{"uid":"k22","type":"integrated","module":"k20","offset":0,"depth":80,"drain":"zarf","w":800,"faucet":"deliksiz","d":300}],"mirrors":[{"uid":"k92","shape":"organik","w":850,"h":835,"x":-450,"bottom":1120,"led":true}],"sides":{"mat":"front"}}}};
 let takimName = null;
 try {
   const tq = new URLSearchParams(location.search).get('takim');
@@ -853,7 +861,8 @@ try {
     const u = new URL(location.href); u.searchParams.delete('takim'); history.replaceState(null, '', u.pathname + u.search + u.hash);
   }
 } catch (e) {}
-if (!cfg || !Array.isArray(cfg.modules)) cfg = START && START.cfg ? clone(START.cfg) : defaultConfig();
+let fromStart = false; // açılış tasarımı yüklendiyse START kamerası uygulanır; kendi taslağıyla açana uygulanmaz (tam tarama 2026-11-10)
+if (!cfg || !Array.isArray(cfg.modules)){ fromStart = !!(START && START.cfg); cfg = fromStart ? clone(START.cfg) : defaultConfig(); }
 migrateTypes(cfg);
 const ui = {tab:'config', sel: cfg.modules[0]?.uid || null, openSet: new Set(), dims:true, edges:true, libType:'c1', linked:null, orderSel:null, search:'', filter:'all', armDelete:null,
   selSet:new Set(), leftTab:'modul', rightTab:'modul', selMirror: cfg.mirrors[0]?.uid || null, selSink: cfg.sinks[0]?.uid || null};
@@ -894,7 +903,7 @@ const gFront = m => m.grainF === 'h' || m.grainF === 'v' ? m.grainF : (isTall(m)
 const gSide = m => m.grainS === 'h' || m.grainS === 'v' ? m.grainS : 'v';
 function grainUI(c, m){ // Modül panelinde su yönü seçimi (kapak; kapaması varsa kapama)
   const segG = (k, cur, label) => `<div class="lbl" style="margin:10px 0 6px">${label}</div><div class="seg"><button data-act="mset" data-k="${k}" data-v="h" aria-pressed="${cur === 'h'}">Yatay</button><button data-act="mset" data-k="${k}" data-v="v" aria-pressed="${cur === 'v'}">Dikey</button></div>`;
-  const fG = grained(c.front.mat, c.front.color), sideOn = ['left', 'right'].some(k => msT(m, k)), sMat = c.sides.mat === 'body' ? c.body : c.front, sG = sideOn && grained(sMat.mat, sMat.color);
+  const fG = grained(c.front.mat, c.front.color) && !aluGlass(m) && !(isUpper(m) && m.mirrorDoor), sideOn = ['left', 'right'].some(k => msT(m, k)), sMat = c.sides.mat === 'body' ? c.body : c.front, sG = sideOn && grained(sMat.mat, sMat.color); // fG: alüminyum çerçeveli cam ve aynalı kapakta ahşap ön yüz yok (tam tarama 2026-11-10)
   return (fG ? segG('grainF', gFront(m), 'Kapak su yönü') : '') + (sG ? segG('grainS', gSide(m), 'Kapama su yönü') : '');
 }
 /* kapama malzemesi (kapakla ya da gövdeyle aynı) ve ona göre hızlı kalınlık seçenekleri: kaplama 9 / 19, lam-lake 8 / 18 mm */
@@ -994,6 +1003,12 @@ function normalize(c = cfg){
   // eksik / eski kayıtlarda ana alanlar (sipariş görünümü ve fiyat bunlara güvenir)
   c.top = c.top || {}; c.body = c.body || {mat:'lam'}; c.front = c.front || {mat:'lam'};
   c.modules = c.modules || []; c.sinks = c.sinks || []; c.mirrors = c.mirrors || [];
+  { // GÜVENLİK (tam tarama 2026-11-10): uid'ler HTML özniteliklerine yazılır; ortak kayıttan gelen bozuk / tekrarlı uid yenilenir, lavabo eşlemesi güncellenir
+    const ok = v => typeof v === 'string' && /^[a-z0-9_-]{1,24}$/i.test(v), seen = new Set(), remap = {};
+    c.modules.forEach(m => { if (!ok(m.uid) || seen.has(m.uid)){ const n = uid(); remap[m.uid] = n; m.uid = n; } seen.add(m.uid); });
+    c.sinks.forEach(s => { if (s.module in remap) s.module = remap[s.module]; });
+    [...c.sinks, ...c.mirrors].forEach(o => { if (!ok(o.uid) || seen.has(o.uid)) o.uid = uid(); seen.add(o.uid); });
+  }
   if (!TOP_T.includes(c.top.t)) c.top.t = TOP_T.reduce((a, b) => Math.abs(b - (+c.top.t || 6)) < Math.abs(a - (+c.top.t || 6)) ? b : a); // listede olmayan (eski 12 / 20 / 25 / 40 / 60 / 100) en yakına
   c.top.surf = 'mat'; // yüzey seçimi yok (kullanıcı 2026-10-22); eski parlak / soft / strüktürel kayıtlar mat
   if (!TOPS.some(t => t.id === c.top.color)) c.top.color = TOPS[0].id;
@@ -1056,14 +1071,14 @@ function normalize(c = cfg){
       if (tallElcik(m)){ const dd = moduleDims(m, c), [lo, hi] = elcikRange(dd.bottomY + 1.5, dd.topY - 1.5); m.elcikY = clamp(Math.round((m.elcikY != null ? +m.elcikY : ELCIK.y0)/10)*10, lo, Math.max(lo, hi)); } // elcik açıklığının altı yerden (ilk 88 cm), kapağın içinde
     }
     if (isUpper(m)){ // ÜST MODÜL (U1 / U2): ölçüler tipin sınırında, kulp modüle özel (gola gövde altında / push-open / çubuk kulp), aynalı kapak isteğe bağlı; yan kapama modül boyunda (yere kadar yok)
-      const Tu = TYPES[m.type]; m.hidden = false; delete m.idr; delete m.gapL;
+      const Tu = TYPES[m.type]; m.hidden = false; delete m.idr; delete m.gapL; if (upperGlass(m)) m.glassFrame = m.glassFrame === 'alu' ? 'alu' : 'ahsap'; else delete m.glassFrame; // camlı kapak çerçevesi: ahşap (5 cm) / alüminyum (20 mm)
       m.width = clamp(Math.round((+m.width || Tu.W)/Tu.Wstep)*Tu.Wstep, Tu.Wmin, Tu.Wmax);
       m.height = clamp(Math.round((+m.height || Tu.H)/Tu.Hstep)*Tu.Hstep, Tu.Hmin, Tu.Hmax);
       if (!HANDLES[m.handle]) m.handle = c.handle; if (!HANDLE_COLORS[m.handleColor]) m.handleColor = c.handleColor; if (!KANAL_FIN[m.kanalFin]) m.kanalFin = c.kanalFin;
       if (m.hinge !== 'L' && m.hinge !== 'R') m.hinge = 'R';
       m.mirrorDoor = !!m.mirrorDoor && !layoutOf(m).glass; // camlı kapakta ayna yok
       m.bottom = clamp(Math.round((m.bottom != null ? +m.bottom : topH(c) + UPPER_UP)/10)*10, 0, 2400 - m.height); // ilk konulduğunda tezgah üstünden 50 cm
-      m.x = clamp(Math.round((+m.x || 0)/10)*10, -5000, 5000);
+      m.x = clamp(Math.round((+m.x || 0)/10)*10, -UPPER_XMAX, UPPER_XMAX);
       ['left', 'right'].forEach(k => { m.sides[k].full = false; }); // yan kapama seçilebilir (kullanıcı 2026-10-26), yere kadar olmaz
     }
   });
@@ -1121,6 +1136,8 @@ function posClashes(c = cfg, mx = moduleX(c)){
   const mir = c.mirrors.map((mi, k) => ({n: c.mirrors.length > 1 ? `Ayna ${k + 1}` : 'Ayna', x0: mi.x - mi.w/2, x1: mi.x + mi.w/2, y0: mi.bottom, y1: mi.bottom + mi.h}));
   const talls = c.modules.map((m, i) => ({m, i})).filter(o => isTall(o.m)).map(({m, i}) => { const r = mx.map[m.uid], d = moduleDims(m, c); return {n: `M${i + 1} (boy dolap)`, x0: r.x0 - r.lt, x1: r.x1 + r.rt, y0: d.bottomY, y1: d.topY}; });
   const th = topH(c), tops = topRuns(c, mx).map(r => ({x0: r.x0, x1: r.x1, y0: 0, y1: th}));
+  // tezgahsız tezgah altı modüller (kapamaları ve üst paneli dahil): üst modül bunların içine inerse de uyarı (tam tarama 2026-11-10)
+  const lows = c.modules.map((m, i) => ({m, i})).filter(o => !isTall(o.m) && !isUpper(o.m) && !modTop(o.m)).map(({m, i}) => { const r = mx.map[m.uid], d = moduleDims(m, c); return {n: `M${i + 1}`, x0: r.x0 - r.lt, x1: r.x1 + r.rt, y0: 0, y1: d.topY + (panelOn(m) ? panelT(m, c) : 0)}; });
   // üst modüller (U1 / U2): ayna, boy dolap, başka üst modül ve tezgahla çakışma (kullanıcı 2026-10-20)
   const ups = c.modules.map((m, i) => ({m, i})).filter(o => isUpper(o.m)).map(({m, i}) => { const r = mx.map[m.uid], d = moduleDims(m, c); return {n: `M${i + 1} (${TYPES[m.type].short})`, x0: r.x0 - r.lt, x1: r.x1 + r.rt, y0: d.bottomY, y1: d.topY}; }); // kapamaları dahil
   ups.forEach((u, k) => {
@@ -1128,11 +1145,17 @@ function posClashes(c = cfg, mx = moduleX(c)){
     talls.forEach(t => { const o = ov(u, t); if (o) out.push({...o, msg: `${u.n} üst modülü ${t.n} ile çakışıyor.`}); });
     ups.slice(k + 1).forEach(b => { const o = ov(u, b); if (o) out.push({...o, msg: `${u.n} ile ${b.n} üst üste geliyor.`}); });
     tops.forEach(t => { const o = ov(u, t); if (o) out.push({...o, msg: `${u.n} tezgahın altına iniyor (alt kenar ${String(u.y0/10).replace('.', ',')} cm, tezgah ${String(th/10).replace('.', ',')} cm).`}); });
+    lows.forEach(t => { const o = ov(u, t); if (o) out.push({...o, msg: `${u.n} üst modülü ${t.n} modülünün içine iniyor (alt kenar ${String(u.y0/10).replace('.', ',')} cm, ${t.n} üstü ${String(Math.round(t.y1)/10).replace('.', ',')} cm).`}); });
   });
+  // DUVAR BATARYASI (deliksiz lavabo; wallFaucet: ağız rozeti x'te, karıştırıcı x + WF.gap'te, eksen kenarın 150 mm üstünde): ayna içine girerse uyarı (tam tarama 2026-11-10)
+  const taps = c.sinks.filter(s => s.faucet !== 'delikli' && c.modules.some(m => m.uid === s.module)).map(s => { const cx = sinkCenterX(s, c, mx), rim = th + (s.type === 'integrated' ? 0 : vesselH(s));
+    return {x0: cx - WF.rose, x1: cx + WF.gap + WF.rose, y0: rim, y1: rim + 150 + WF.rose}; });
   mir.forEach((a, k) => {
+    taps.forEach(t => { const o = ov(a, t); if (o) out.push({...o, msg: `${a.n} duvar bataryasıyla çakışıyor (batarya üstü ${String(Math.round(t.y1)/10).replace('.', ',')} cm, ayna alt kenarı ${String(a.y0/10).replace('.', ',')} cm); aynayı yükseltin.`}); });
     talls.forEach(t => { const o = ov(a, t); if (o) out.push({...o, msg: `${a.n}, ${t.n} ile çakışıyor.`}); });
     mir.slice(k + 1).forEach(b => { const o = ov(a, b); if (o) out.push({...o, msg: `${a.n} ile ${b.n} üst üste geliyor.`}); });
     tops.forEach(t => { const o = ov(a, t); if (o) out.push({...o, msg: `${a.n} tezgahın altına iniyor (alt kenar ${String(a.y0/10).replace('.', ',')} cm, tezgah ${String(th/10).replace('.', ',')} cm).`}); });
+    lows.forEach(t => { const o = ov(a, t); if (o) out.push({...o, msg: `${a.n}, ${t.n} modülünün içine iniyor (alt kenar ${String(a.y0/10).replace('.', ',')} cm, ${t.n} üstü ${String(Math.round(t.y1)/10).replace('.', ',')} cm).`}); });
   });
   doorHits(c, mx).forEach(h => out.push(h));
   return out;
@@ -1193,6 +1216,17 @@ function warnings(c = cfg){
     const drawn = new Set(intRanges(c, mx).map(r => r.s)), hidden = c.sinks.filter(s => s.type === 'integrated' && !drawn.has(s)).length;
     if (hidden) out.push(`${hidden} porselen eviye başka bir eviyeyle çakıştığı için çizilmiyor; eviyeleri ayırın.`);
     else for (let i = 1; i < ints.length; i++) if (ints[i].x0 < ints[i-1].x1 + 60){ out.push('İki entegre lavabo arasında en az 60 mm tezgah kalmalı.'); break; }
+  }
+  { // ÇANAK LAVABO ÇAKIŞMASI (tam tarama 2026-11-10): çanak ↔ çanak ve çanak ↔ (çizilen) porselen eviye üstten bakışta üst üste binerse
+    const mn = s => 'M' + (c.modules.findIndex(m => m.uid === s.module) + 1);
+    const rect = s => { const cx = sinkCenterX(s, c, mx), cz = sinkZ(s, c); return {x0: cx - s.w/2, x1: cx + s.w/2, z0: cz - s.d/2, z1: cz + s.d/2}; };
+    const hit = (a, b) => Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > 1 && Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0) > 1;
+    const ves = c.sinks.filter(s => s.type !== 'integrated' && c.modules.some(m => m.uid === s.module)), drawnInt = intRanges(c, mx);
+    ves.forEach((s, k) => {
+      const a = rect(s);
+      ves.slice(k + 1).forEach(t => { if (hit(a, rect(t))) out.push(`İki çanak lavabo üst üste geliyor (${[...new Set([mn(s), mn(t)])].join(" · ")}); birini kaydırın ya da başka modüle alın.`); });
+      drawnInt.forEach(r => { if (hit(a, r)) out.push(`Çanak lavabo porselen eviyenin üstüne geliyor (${[...new Set([mn(s), mn(r.s)])].join(" · ")}); birini kaydırın ya da başka modüle alın.`); });
+    });
   }
   c.sinks.forEach(s => {
     const x = sinkCenterX(s, c, mx), tr = topRuns(c, mx).find(r => r.mods.some(m => m.uid === s.module)); // kendi tezgah parçası (tezgahsız modülde uyarı yok)
@@ -1266,11 +1300,13 @@ function cutList(c = cfg){
       push('Ayarlı raf', mod, nSh, W - 2*T - 2, cdu - TALL_BACK_IN - 20, T, bName, bKey);
       push('Arkalık', mod, 1, W - 2*T + 10, ch - T, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, ön yüzü arka kenardan ${TALL_BACK_IN} mm içeride · alt tablanın üstünden en üste kadar, yukarıdan sürülür`);
       const st = (m.mirrorDoor ? ' · Aynalı kapak (önde 4 mm ayna)' : c.front.style !== 'duz' ? ' · ' + frontStyleText(c.front) : '') + (fGrain('dikey') ? ' · ' + fGrain('dikey') : '');
-      if (upperGlass(m)){ // CAMLI KAPAK: TEK PARÇA çerçeve (kullanıcı 2026-10-20) — kapak plakasının ortası CNC ile boşaltılır, 5 cm çerçeve kalır; cam arkadan 8 mm lambada
+      if (aluGlass(m)) (pair ? ['sol', 'sağ'] : [side]).forEach(k => // ALÜMİNYUM ÇERÇEVELİ CAM KAPAK: hazır kapak (ahşap parça yok), fiyat sonra girilecek
+        hw.push({item:`Alüminyum çerçeveli cam kapak (${pair ? k : 'tek'}, menteşe ${k}) · mat siyah alüminyum profil: önde ${ALU_FRAME} mm, arkada ${ALU_BACK} mm menteşe kanadı · 4 mm füme temperli cam · ${String(DW).replace(".", ",")} × ${String(dH).replace(".", ",")} mm · alüminyum çerçeveye uygun menteşe kabı teyit edilecek`, mod, qty:1, price: PRICE.aluDoor}));
+      else if (upperGlass(m)){ // CAMLI KAPAK: TEK PARÇA çerçeve (kullanıcı 2026-10-20) — kapak plakasının ortası CNC ile boşaltılır, 5 cm çerçeve kalır; cam arkadan 8 mm lambada
         const F = UPPER_FRAME, gw = DW - 2*F + 16, gh = dH - 2*F + 16;
         (pair ? ['sol', 'sağ'] : [side]).forEach(k => { const lab = `Kapak (${pair ? k : 'tek'}) · camlı`;
-          push(lab, mod, 1, dH, DW, fT, fName, fKey, `menteşe ${k} · TEK PARÇA çerçeve: ortası CNC ile boşaltılır, ${F} mm çerçeve kalır (açıklık ${DW - 2*F} × ${dH - 2*F} mm) · iç kenarda arkadan 8 × 8 mm cam lambası · iç kenarlar da bantlı · Düz kapak (camlı kapakta çıta olmaz)` + (fGrain('dikey') ? ' · ' + fGrain('dikey') : ''));
-          rows[rows.length - 1].band = [4, 4]; // dış + iç kenarlar
+          push(lab, mod, 1, dH, DW, fT, fName, fKey, `menteşe ${k} · TEK PARÇA çerçeve: ortası CNC ile boşaltılır, ${F} mm çerçeve kalır (açıklık ${DW - 2*F} × ${dH - 2*F} mm) · iç kenarda arkadan 8 × 8 mm cam lambası · iç kenarlar da bantlı (iç çevre ${2*(dH - 2*F) + 2*(DW - 2*F)} mm) · Düz kapak (camlı kapakta çıta olmaz)` + (fGrain('dikey') ? ' · ' + fGrain('dikey') : ''));
+          rows[rows.length - 1].band = [2, 2]; rows[rows.length - 1].bandX = 2*(dH - 2*F) + 2*(DW - 2*F); // dış kenarlar + iç çevre (açıklık) ayrı metraj (eskiden iç çevre dış çevre kadar sayılıyordu; tam tarama 2026-11-10)
           hw.push({item:`CNC iç boşaltma + cam lambası (${lab})`, mod, qty:1, price:0});
           hw.push({item:`Cam 4 mm şeffaf temperli (${lab}) · ${gw} × ${gh} mm · arkadan silikon / cam çıtası`, mod, qty:1, price: Math.round(gw*gh/1e6*PRICE.glassM2*100)/100}); });
       }
@@ -1364,10 +1400,13 @@ function cutList(c = cfg){
     }
     const s = sinkOver(m, c), fit = drawerFit(m, c, mx); // 3B ile ortak kutu hesabı
     const bz = onBase(m); // BİRLEŞİM (kullanıcı çizimi 2026-10-10): askıda yanlar tam boy, tablalar arada; bazalıda ALT TABLA TAM EN, yanlar onun üstünde
-    push('Yan dikme', mod, 2, bz ? H - T : H, cd, T, bName, bKey, bz ? 'Bazalı: alt tablanın üstüne oturur' : 'Askı: tam boy, tablalar arada');
+    const ug = c.handle === 'kanal', mmTxt = v => String(Math.round(v*10)/10).replace('.', ','); // GOLA KERTİĞİ (3B buildModule golaCut ile aynı): yan dikmelerin ön kenarında
+    const gNotch = ug ? (() => { const s0 = bz ? T : 0; let yT = H; return hs.map((h, k) => { const yb = yT - h; yT = yb; const gs = golaSpan(yb, h, k);
+      return k === 0 ? `üstte J ${GOLA_D} × ${mmTxt(J_H)} mm` : `C ${GOLA_D} × ${C_H} mm, alttan ${mmTxt(gs.y0 - s0)} mm`; }).join(' · '); })() : '';
+    push('Yan dikme', mod, 2, bz ? H - T : H, cd, T, bName, bKey, (bz ? 'Bazalı: alt tablanın üstüne oturur' : 'Askı: tam boy, tablalar arada') + (ug ? ' · ön kenarda gola kertiği: ' + gNotch : ''));
     push('Alt tabla', mod, 1, bz ? W : W - 2*T, cd, T, bName, bKey, bz ? 'Bazalı: tam en, yan dikmeler üstünde' : 'Yan dikmelerin arasında');
     if (!modTop(m)){
-      push('Üst tabla', mod, 1, W - 2*T, cd - TALL_BACK_IN, T, bName, bKey, 'Tezgah yok · dolabın üstü kapalı · arkalığın önünde biter');
+      push('Üst tabla', mod, 1, W - 2*T, cd - TALL_BACK_IN - (ug ? GOLA_D : 0), T, bName, bKey, 'Tezgah yok · dolabın üstü kapalı · arkalığın önünde biter' + (ug ? ` · önde gola profiline kadar (${GOLA_D} mm geride biter)` : ''));
       // üst panel aşağıda (panelRuns): yan yana panelli modüllerde tek parça
     }
     else if (s){
@@ -1375,13 +1414,13 @@ function cutList(c = cfg){
       // ön bağlantı (kullanıcı 2026-10-13): golada J gola profili kayıt işini görür (ayrı parça yok); golasızda plakadan dik ön kayıt —
       // önden görünecekse kapak (dış) malzemesi, görünmüyorsa gövde malzemesi; tezgah altında kapak üstü 5 mm boşlukla kayıt kapağın arkasında kalır → gövde
       if (c.handle !== 'kanal') push('Ön üst kayıt (dikey)', mod, 1, W - 2*T, 50, T, bName, bKey, 'Lavabo modülü · kapağın arkasında (görünmez, gövde malzemesi) · hazneye yer bırakır');
-    } else push('Üst kayıt', mod, 2, W - 2*T, 100, T, bName, bKey);
+    } else { push('Üst kayıt (ön)', mod, 1, W - 2*T, ug ? 100 - GOLA_D : 100, T, bName, bKey, ug ? `Önde gola profiline kadar (${GOLA_D} mm geride biter)` : ''); push('Üst kayıt (arka)', mod, 1, W - 2*T, 100, T, bName, bKey, 'Arkalığın önünde'); }
     push('Arkalık', mod, 1, W - 2*T + 10, H - T, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, ön yüzü arka kenardan ${TALL_BACK_IN} mm içeride`);
     if (onBase(m)) hw.push({item:'Ayarlı baza ayağı', mod, qty:4, price:PRICE.plinth}); // baza paneli m² ile, ayaklar burada
     else hw.push({item:'Gizli askı mekanizması', mod, qty:2, price:0});
     hs.forEach((h,k) => {
       const u = s && k === 0, uw = uCutW(W, T);
-      push(`Çekmece kapağı ${k+1}`, mod, 1, doorFit(m).dw, doorH(h, k, c.handle === 'kanal'), fT, fName, fKey, [c.front.style !== 'duz' ? frontStyleText(c.front) : '', u ? 'Kapak düz · kutu U kesim' : '', fGrain('yatay')].filter(Boolean).join(' · '));
+      push(`Çekmece kapağı ${k+1}`, mod, 1, doorFit(m).dw, doorH(h, k, c.handle === 'kanal'), fT, fName, fKey, [c.front.style !== 'duz' ? frontStyleText(c.front) : '', u ? 'Kapak kesilmez · kutu U kesim' : '', fGrain('yatay')].filter(Boolean).join(' · '));
       trimRows(`Çekmece kapağı çıtası ${k+1}`, mod, doorFit(m).dw, doorH(h, k, c.handle === 'kanal'));
       // LEGRABOX: taban 16 mm (LW − 35) × (NL − 10); ahşap arkalık (LW − 38) gövde malzemesinde; boy 3B ile aynı (drawerFit)
       const lg = fit[k].lgb, LW = W - 2*T;
@@ -1419,21 +1458,22 @@ function cutList(c = cfg){
   c.modules.forEach((m, i) => ['left', 'right'].forEach(k => {
     const t = msT(m, k); if (!t) return;
     const sg = sideGeom(c, m, k, mx), useBody = c.sides.mat === 'body', h = sg.y1 - sg.y0;
-    const kb = [1, (sg.floor ? 0 : 1) + (isTall(m) || isUpper(m) ? 1 : 0)]; // kenar bandı: ön kenar (boy) + açıkta kalan alt / boy dolapta ve üst modülde üst kenar (en)
+    const kb = [1, (sg.floor ? 0 : 1) + (isTall(m) || isUpper(m) || (!modTop(m) && !panelOn(m)) ? 1 : 0)]; // tezgahsız + üst panelsiz modülde üst kenar da açıkta (tam tarama 2026-11-10) // kenar bandı: ön kenar (boy) + açıkta kalan alt / boy dolapta ve üst modülde üst kenar (en)
     const foot = sg.floor ? `+ ${PABUC} mm pabuç (${h} + ${PABUC} = ${h + PABUC} mm)` : '';
-    if (sg.floor) hw.push({item:`Pabuç Ø7 × ${PABUC} mm (önden/arkadan 100 mm) · yan kapama ${k === 'left' ? 'sol' : 'sağ'} altı`, mod: 'M' + (i + 1), qty:2, price:0});
+    if (sg.floor){ const sh0 = m.sides[k].shape || 'L', lg0 = sideLegs(sh0, sg.depth), len = sideSingle(c, t) ? sg.depth : Math.max(lg0.in, lg0.out), pi = pabucIn(len); // 3B ile aynı yer
+      hw.push({item:`Pabuç Ø7 × ${PABUC} mm (${len >= 400 ? `önden/arkadan ${pi} mm` : `${len} mm bacağın önünden ve arka ucundan ${pi} mm`}) · yan kapama ${k === 'left' ? 'sol' : 'sağ'} altı`, mod: 'M' + (i + 1), qty:2, price:0}); }
     const sm = useBody ? bm : fm, nm = `Yan kapama ${k === 'left' ? 'sol' : 'sağ'}`, mod = 'M' + (i + 1), shape = m.sides[k].shape || 'L';
-    const grain = sm.key === 'kaplama' ? 'Su yönü dikey (boy)' : '', notch = sideBazaNotch(c, m, sg.x0, t, mx) ? `baza kertiği ${PLINTH - PABUC} × ${40 + fT} mm (önde, altta)` : '';
+    const grain = sm.key === 'kaplama' ? 'Su yönü dikey (boy)' : '';
     if (sideSingle(c, t)){ // tek plaka
-      push(nm, mod, 1, h, sg.depth, t, (useBody ? bName : fName).replace(/\d+ mm/, t + ' mm'), sm.key + (t <= 9 ? '9' : sm.t), [foot, grain, notch].filter(Boolean).join(' · '));
+      push(nm, mod, 1, h, sg.depth, t, (useBody ? bName : fName).replace(/\d+ mm/, t + ' mm'), sm.key + (t <= 9 ? '9' : sm.t), [foot, grain].filter(Boolean).join(' · '));
       rows[rows.length - 1].band = kb; return;
     }
-    // dönülerek yapılan kapama: plakalar 45° gönye ile birleşir (gönyeli kenarlar bantsız); açıkta kalan alt / üst uç kapakla kapanır
+    // dönülerek yapılan kapama: plakalar 45° gönye ile birleşir (gönyeli kenarlar bantsız); profilin üstü ve altı açık bırakılır (uç kapağı yok)
     const p = sidePlate(c, t, shape), pName = (useBody ? bName : fName).replace(/\d+ mm/, p + ' mm'), pKey = sm.key + (p <= 9 ? '9' : sm.t);
     const tag = `${shape} dönüş · ${t} mm kapama · ${p} mm plaka` + (foot ? ' · ' + foot : '');
     const piece = (part, L, W, note) => { push(`${nm} · ${part}`, mod, 1, L, W, p, pName, pKey, [tag, note, grain].filter(Boolean).join(' · ')); rows[rows.length - 1].band = [0, 0]; };
     const lg = sideLegs(shape, sg.depth);
-    piece('ön yüz', h, t, [lg.out ? 'iki kenar 45° gönye' : 'dolap tarafı kenarı 45° gönye', notch].filter(Boolean).join(' · '));
+    piece('ön yüz', h, t, lg.out ? 'iki kenar 45° gönye' : 'dolap tarafı kenarı 45° gönye');
     const legNote = L => `ön kenar 45° gönye · ${L} mm` + (L > sg.depth ? ` (${sg.depth} + ${SIDE_BACK} mm arkaya pay)` : '');
     piece('dolap tarafı bacak', h, lg.in, legNote(lg.in));
     if (lg.out) piece('dış bacak', h, lg.out, legNote(lg.out));
@@ -1444,7 +1484,8 @@ function cutList(c = cfg){
     const tr = topRuns(c, mx), nm = k => tr.length > 1 ? ` (${tr[k].mods.map(m => 'M' + (c.modules.indexOf(m) + 1)).join(' · ')})` : '';
     tr.forEach((r, k) => {
       tops.push({part:'Porselen tezgah' + nm(k), L:r.L, W:topD(c), t:c.top.t, mat:`${topById(c.top.color).name}`});
-      if (c.top.t > 12) tops.push({part:'Ön düşey bant (45° birleşim)' + nm(k), L:r.L, W:c.top.t, t:12, mat:'Aynı seri'}); });
+      if (c.top.t > 12){ tops.push({part:'Ön düşey bant (45° birleşim)' + nm(k), L:r.L, W:c.top.t, t:12, mat:'Aynı seri'});
+        tops.push({part:'Yan düşey bant sol + sağ (45° birleşim)' + nm(k), qty:2, L:topD(c), W:c.top.t, t:12, mat:'Aynı seri'}); } }); // kalın tezgahın açık uçları (kullanıcı 2026-11-10: listeye eklensin; fiyat tezgah m² fiyatına dahil)
   }
   const sinksOut = c.sinks.map(s => ({s, label:SINKS[s.type].label + (s.type === 'integrated' ? ' · ' + DRAINS[s.drain] : ''), dims: s.type === 'integrated' ? `${s.w}×${s.d} · ${s.depth} mm` : vesselName(s)}));
   // SU YÖNÜ modüle özel: BOY sütunu su yönüdür. Seçilen yön varsayılandan farklıysa (çekmece kapağı yatay, boy dolap kapağı ve kapama dikey)
@@ -1452,7 +1493,7 @@ function cutList(c = cfg){
   rows.forEach(r => {
     if (!/Su yönü (yatay|dikey)/.test(r.note || '')) return;
     const m = c.modules[+(String(r.mod).match(/^M(\d+)$/) || [])[1] - 1]; if (!m) return;
-    const front = /^(Çekmece kapağı \d+|Kapak \()/.test(r.part) && !/çıtası/.test(r.part), side = /^Yan kapama/.test(r.part);
+    const front = /^(Çekmece kapağı (\d+|\(çamaşır)|Kapak \()/.test(r.part) && !/çıtası/.test(r.part), side = /^Yan kapama/.test(r.part);
     if (!front && !side) return;
     const cur = /Su yönü yatay/.test(r.note) ? 'h' : 'v', want = front ? gFront(m) : gSide(m);
     if (cur === want) return;
@@ -1474,7 +1515,7 @@ function cutList(c = cfg){
   const bands = {};
   rows.forEach(r => {
     r.band = /^lake/.test(r.key || '') ? [0, 0] : bandOf(r);
-    const len = r.qty*(r.band[0]*r.L + r.band[1]*r.W); if (!len) return;
+    const len = r.qty*(r.band[0]*r.L + r.band[1]*r.W + (/^lake/.test(r.key || '') ? 0 : r.bandX || 0)); if (!len) return; // bandX: sayılarla anlatılamayan ek bant (camlı kapağın iç çevresi, mm)
     const w = r.t <= 19 ? 22 : r.t + 3, k = `${r.mat} · ${w} mm`;
     (bands[k] = bands[k] || {m: 0, mat: (r.key || '').replace(/\d+$/, '')}).m += len/1000;
   });
@@ -1491,7 +1532,7 @@ function priceOf(c = cfg){
     else if (r.part.startsWith('Yan kapama')) sides += a*rate; // kapama: kullanılan plakalar (tek plaka ya da L/J/U parçaları) kendi m² fiyatıyla, ek zam yok (kullanıcı 2026-10-13)
     else if (front) fronts += a*rate; else carcass += a*rate;
   });
-  const hwSum = cl.hw.filter(h => h.kind !== 'org').reduce((s,h) => s + h.qty*h.price, 0);
+  const hwSum = cl.hw.reduce((s,h) => s + h.qty*h.price, 0);
   const mx = moduleX(c);
   const top = topRuns(c, mx).reduce((a, r) => a + r.L, 0)*topD(c)/1e6 * PRICE.topM2[c.top.t]; // yalnız tezgahlı modüllerin üstü
   const band = Object.values(cl.bands).reduce((s, b) => s + b.m*(PRICE.bandM[b.mat] || 0), 0);
@@ -1582,6 +1623,8 @@ function stoneTex(t){
   tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.encoding = THREE.sRGBEncoding; tx.anisotropy = 8;
   return texCache[key] = tx;
 }
+/* LAKE RENK DENGESİ (kullanıcı 2026-11-12 "konfigüratörde lake rengi doğru mu, katalogda düzelttiğimiz renk… düzelt doğru görünsün"): sahne ışığı sıcak (hemisfer fffaf2, güneş fff6ea) → DCS02 ekranda krem / sarı (230, 218, 202) görünüyordu; yalnız lake malzemesinde doğrusal G / B çarpanı, renk tanımı (hex) değişmez */
+const LAKE_WB = [1, 1.025, 1.08];
 function std(key, make){ if (!matCache[key]) matCache[key] = make(); return matCache[key]; }
 function panelMat(matKey, colorId, fin){
   const col = colorOf(matKey, colorId);
@@ -1596,7 +1639,8 @@ function panelMat(matKey, colorId, fin){
       m.userData.tile = 1000; return m;
     }
     const rough = matKey === 'lake' ? LAKE_FIN.ipek.r : .5;
-    return new THREE.MeshStandardMaterial({color: srgb(col.hex), roughness: rough, metalness:0, envMapIntensity: matKey === 'lake' ? .8 : .5});
+    const c = srgb(col.hex); if (matKey === 'lake') c.setRGB(c.r*LAKE_WB[0], c.g*LAKE_WB[1], c.b*LAKE_WB[2]); // lake: sahnenin sıcak ışığı lakeyi sarıya çekiyordu, katalogdaki nötr tonla eşitlenir
+    return new THREE.MeshStandardMaterial({color: c, roughness: rough, metalness:0, envMapIntensity: matKey === 'lake' ? .8 : .5});
   });
 }
 function handleMat(key = cfg.handleColor){
@@ -1720,7 +1764,7 @@ function initScene(){
   root = new THREE.Group(); root.scale.setScalar(.001); scene.add(root);
   applyStageBg();
   camPersp(true);
-  if (START && START.cam && !takimName) applyStartCam(START.cam); // katalog takımı açıldıysa kamera takıma sığdırılır (camPersp)
+  if (START && START.cam && !takimName && fromStart) applyStartCam(START.cam); // katalog takımı açıldıysa kamera takıma sığdırılır (camPersp)
   new ResizeObserver(resize).observe(vpEl); resize();
   controls.minZoom = .3; controls.maxZoom = 8;
   try { if (localStorage.getItem('a86_proj') === 'ortho') setProjection('ortho'); } catch (e) {}
@@ -1980,7 +2024,8 @@ function buildPanels(mx){ // üst paneller (kapak malzemesi), birleşik parçala
 function plinthRuns(c = cfg, mx = moduleX(c)){
   const runs = []; let cur = null;
   c.modules.forEach((m, i) => {
-    if (!onBase(m) || gapOf(m, c)) cur = null; // modüller arası boşlukta baza da bölünür
+    const prev = c.modules[i - 1];
+    if (!onBase(m) || gapOf(m, c) || msT(m, 'left') || (prev && msT(prev, 'right'))) cur = null; // modüller arası boşlukta ve ARADAKİ KAPAMADA baza bölünür (kullanıcı 2026-11-10: aradaki kapama da dıştaki gibi yere kadar tam, kertiksiz; baza kapamaya dayanır)
     if (!onBase(m)) return;
     const r = mx.map[m.uid];
     if (cur) { cur.x1 = r.x1; cur.i1 = i; } else { cur = {x0: r.x0, x1: r.x1, i0: i, i1: i}; runs.push(cur); }
@@ -1989,6 +2034,7 @@ function plinthRuns(c = cfg, mx = moduleX(c)){
 }
 /* pabuç: Ø7 × 5 mm yuvarlak düğme (koyu), x/z noktasında yere basar */
 function pabucAt(x, z, parent){ const p = cyl(3.5, PABUC, M.plinth, parent); p.position.set(x, PABUC/2, z); return p; }
+const pabucIn = len => len >= 400 ? 100 : Math.min(20, len/4); // kapama pabucu uçtan içeri (mm): uzun parçada 100, kısa L bacağında 20
 function buildPlinths(mx){
   const c = cfg, fT = matT(c.front.mat), cd = c.depth - fT, fm = panelMat(c.front.mat, c.front.color, c.front.fin);
   plinthRuns(c, mx).forEach(r => { // ön yüzü kapak yüzünden 40 mm geride; altında 5 mm pabuç (panel PLINTH − PABUC)
@@ -2034,7 +2080,10 @@ function buildModule(m, x0, idx, mx){
     // lavabo modülü: hazne sarktığı için yatık üst kayıt yok; golada J profil ön bağlantıdır, golasızda gövde plakasından dik ön kayıt (kapağın arkasında) + arkalığa dik arka kayıt
     if (c.handle !== 'kanal') carve(W - 2*T, 50, T, bm, cx, bottomY + H - 25, cd - 2 - T/2, g, golaCut);
     carve(W - 2*T, 80, T, bm, cx, bottomY + H - 40, TALL_BACK_IN + T/2, g); // arkalığın önünde
-  } else carve(W - 2*T, T, 100, bm, cx, bottomY + H - T/2, cd - 50, g, golaCut);
+  } else { // tezgahlı (lavabosuz) modül: önde ve arkada yatık üst kayıt (100 mm; ön kayıt golada kertilir), arkadaki arkalığın önünde (kullanıcı 2026-11-10: arka kayıt 3B'de de çizilsin)
+    carve(W - 2*T, T, 100, bm, cx, bottomY + H - T/2, cd - 50, g, golaCut);
+    box(W - 2*T, T, 100, bm, cx, bottomY + H - T/2, TALL_BACK_IN + 50, g);
+  }
   const sinkX = s ? sinkCenterX(s, c, mx) : null;
   const fit = drawerFit(m, c, mx); // kutu yükseklikleri / LEGRABOX boyu / gizli çekmece: parça listesiyle ortak hesap
   let yTop = bottomY + H;
@@ -2119,7 +2168,7 @@ const elcikShade = fm => { let s = ELCIK_SHADE.get(fm); if (!s){ s = fm.clone();
    • Gövdede dolap ortasında TAVANDA üst ray (top runner) ve TABANDA kutu biçimli taban rayı (bottom runner), derinlik boyunca.
    • Kayan KEREVİT ÇERÇEVE (ladder frame): arkada, önden bakınca dikdörtgen (iki dikme + üst/alt kayıt); üst ve alt braketle raylara oturur.
    • Sepetler/tepsiler çerçeve dikmelerinin İÇ tarafındaki klipslere asılır, öne doğru uzanır (4 dolu tabanlı antrasit tepsi, Premea tipi).
-   • FOLLOWER (bağlantı kolu): kapağın arkasında üstte ve altta üçgen plaka (3 vida), ondan çerçevenin menteşe tarafı köşesindeki klipse
+   • FOLLOWER (bağlantı kolu): kapağın arkasında üstte ve altta üçgen plaka (3 vida), ondan çerçevenin menteşenin KARŞI tarafındaki köşesindeki klipse
      ÇAPRAZ uzanan çubuk. Kapak açıldıkça kol çerçeveyi KAPAKLA AYNI ANDA öne çeker (gecikme yok): çerçevenin konumu her karede kapak
      açısından ve sabit kol boyundan hesaplanır (B.z = A.z − √(L² − Δx²); A kapaktaki bağlantı, B çerçevedeki köşe).
    b: dolabın İÇ ölçüsü {xL, xR, y0 (alt tabla üstü), y1 (üst tabla altı), z0 (arkalık önü), z1 (gövde ön kenarı)}
@@ -2287,7 +2336,7 @@ function buildHinge(g, dg, {xi, si, sgn, hy, cd, fT, T, gap, px, z155}){
   const bb = (x, y, d, r = 1.5, b = .7) => { const geo = new THREE.ExtrudeGeometry(rr(x - 2*b, y - 2*b, r), {depth: Math.max(.1, d - 2*b), bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 5}); geo.translate(0, 0, -(d - 2*b)/2); return geo; };
   const put = (geo, mat, par, x, y, z) => { const ms = new THREE.Mesh(geo, mat); ms.position.set(x, y, z); ms.castShadow = ms.receiveShadow = true; par.add(ms); return ms; };
   const cyl = (r, h, mat, par, x, y, z, ax) => { const ms = put(new THREE.CylinderGeometry(r, r, h, 28), mat, par, x, y, z); if (ax === 'x') ms.rotation.z = Math.PI/2; if (ax === 'z') ms.rotation.x = Math.PI/2; return ms; };
-  const kin = hingeKin(T, fT, gap), z0 = cd + fT;
+  const kin = hingeKin(T, fT, gap), z0 = dg.position.z; // kapağın KAPALI konumu (push-open'da 3 mm önde): A ve B pimleri aynı z0'dan, bağlantılar sabit boylu kalır (tam tarama 2026-11-10)
   const W = ([U, Z]) => [px + sgn*U, z0 + Z];          // gövdede: mekanizma çerçevesi → dünya (mm)
   const Dl = ([a, b]) => [sgn*a, b];                   // kapakta: mekanizma çerçevesi → kapak grubu (dg) yereli
   const xu = u => xi + si*u;                           // yan panelin iç yüzünden içeri u mm
@@ -2384,10 +2433,10 @@ function buildTall(m, x0, idx, mx){
     const shD = cd - TALL_BACK(c) - (gola ? GOLA_D + 4 : 20), nSh = pairShelves(H);
     [x0, seam].forEach(bx => {
       const bc = bx + hw/2;
-      carve(T, H, cd, bm, bx + T/2, bottomY + H/2, cd/2, g, vCut, true);
-      carve(T, H, cd, bm, bx + hw - T/2, bottomY + H/2, cd/2, g, vCut, true);
-      carve(hw - 2*T, T, cd, bm, bc, bottomY + T/2, cd/2, g, vCut);
-      carve(hw - 2*T, T, cd - TALL_BACK_IN, bm, bc, top - T/2, TALL_BACK_IN + (cd - TALL_BACK_IN)/2, g, vCut); // üst tabla arkalığın önünde biter
+      carve(T, H, cd, bm, bx + T/2, bottomY + H/2, cd/2, g, vCut, true, true); // boy dolap: eviye hazne kesiminden etkilenmez (noBasin)
+      carve(T, H, cd, bm, bx + hw - T/2, bottomY + H/2, cd/2, g, vCut, true, true);
+      carve(hw - 2*T, T, cd, bm, bc, bottomY + T/2, cd/2, g, vCut, false, true);
+      carve(hw - 2*T, T, cd - TALL_BACK_IN, bm, bc, top - T/2, TALL_BACK_IN + (cd - TALL_BACK_IN)/2, g, vCut, false, true); // üst tabla arkalığın önünde biter
       box(hw - 2*T, H - T, backT(c.body.mat), bm, bc, bottomY + T + (H - T)/2, TALL_BACK_IN - backT(c.body.mat)/2, g); // arkalık en üste kadar
       shelfYs(T, H - T, nSh, T).forEach(ay => box(hw - 2*T - 2, T, shD, bm, bc, bottomY + ay, TALL_BACK(c) + shD/2, g)); // net aralar eşit
     });
@@ -2417,7 +2466,7 @@ function buildTall(m, x0, idx, mx){
     ti.fixed.forEach(f => f.mid ? box(W - 2*T, T, sd, bm, cx, bottomY + f.y, TALL_BACK(c) + sd/2, g) : box(W - 2*T, T, shD, bm, cx, bottomY + f.y, TALL_BACK(c) + shD/2, g));
     const adjD = gola && !tallWash(m) ? sd : shD; // golalı iki kapaklı B1: ayarlı raflar gola profilinin arkasında biter (gola hizasına da alınabilsin)
     ti.adj.forEach(ay => box(W - 2*T - 2, T, adjD, bm, cx, bottomY + ay, TALL_BACK(c) + adjD/2, g)); // ayarlı raflar: net aralar eşit
-    // iç çekmece: LEGRABOX, NL 270, yanlar M; M'de 98 mm, C'de 185 mm metal iç ön panel (kulpsuz, rayı örter);
+    // iç çekmece: LEGRABOX, NL 300, yanlar M; metal iç ön panel anma yüksekliğinde (M 90,5, C 177; kulpsuz, rayı örter);
     // C'de arkalık C yüksekliğinde ve yanların üstünde önden arkaya galeri rayı (Blum "front piece with gallery"). Kapaklar ~70° açılınca kayar, kapanırken önce çekmeceler girer
     const z1 = cd - 2, z0 = z1 - IDR_NL, BT = matT(c.body.mat), S = LGB.side; // gövde önüne kadar (kapaktan geride değil); arka ucu arkalığın önünde
     ti.rows.forEach((r, k) => {
@@ -2457,7 +2506,7 @@ function buildTall(m, x0, idx, mx){
       const hys = hingeYs(d.y0, d.y1, tin.rows.map(r => [bottomY + r.fy, bottomY + r.fy + r.fh]), shY.map(y => [bottomY + y - T/2, bottomY + y + T/2])), xi = R ? x0 + W - T : x0 + T, si = R ? -1 : 1;
       hys.forEach(hy => buildHinge(g, dg, {xi, si, sgn, hy, cd, fT, T, gap: R ? df.r : df.l, px, z155: hinge155(m)})); }
     if (pair && th === 'elcik' && (R ? 'R' : 'L') === m.elcikSide){ // B2 elcikli: elcik yalnız seçilen kapakta (m.elcikSide), iç (birleşim) kenarda dikdörtgen oyuk (ELCIK), kapak kalınlığı boyunca
-      // kesit (kullanıcının yan kesiti): ön yüzde ELCIK.h (300) açıklık, ELCIK.lip (2) düz + ELCIK.ch (12) pahla içte ELCIK.hIn (360)'e genişler;
+      // kesit (kullanıcının yan kesiti): ön yüzde ELCIK.h (250) açıklık, ELCIK.lip (2) düz + ELCIK.ch (12) pahla içte ELCIK.hIn (310)'e genişler;
       // cebin dibinde kapak eti (kalınlık = kapak − 14) kalır (oyma, tek parça). Kapak gövdesi 360 boşlukla kesilir, ön dil, pahlar ve cep dibi ayrı mesh
       const xe = sgn*dw, dIn = ELCIK.dIn, xd = xe - sgn*dIn, ec = elcikC(d.y0, d.y1, m), hi = ELCIK.hIn/2, ho = ELCIK.h/2, sh = new THREE.Shape();
       const X = u => xe - sgn*u; // kenardan içeri u mm
@@ -2526,7 +2575,7 @@ function buildTall(m, x0, idx, mx){
   }
 }
 /* ÜST MODÜL (U1 / U2, kullanıcı 2026-10-20): duvara asılı, 25 cm derin; yanlar tam boy, tablalar arada, arkalık kanalda 25 mm içeride (üste kadar);
-   GOLA GÖVDE ALTINDA: alt tabla UPPER_GOLA (26 mm) yukarıda, altında profil (sırt + üst kanat), yanlar önden 26 mm kertilir; kapak profili örter, parmak kapağın altından girer.
+   GOLA GÖVDE ALTINDA: alt tabla modülün en altında (yanlarla hemyüz, önde 26 mm kısa), önünde profil (sırt + tavan kanadı), yanlar önden 26 mm kertilir; kapak profili örter, parmak kapağın altından girer.
    Ayarlı raflar eşit aralıklı; Blum 107° menteşe (gerçek dört çubuklu hareket); U1 tek kapak (sol / sağ menteşe), U2 iki kapak (sol soldan, sağ sağdan); aynalı kapakta önde 4 mm ayna */
 const upperShelves = (m, c = cfg) => { const T = matT(c.body.mat), {H} = moduleDims(m, c), a = m.handle === 'kanal' ? Math.max(T, UPPER_GOLA) : T; return shelfYs(a, H - T, Math.max(1, shelfN(H - T - a)), T); }; // alttan (mm), 3B ve parça listesi ortak
 /* tek parça yan dikme: yandan kesit (z = derinlik, y = yükseklik) x boyunca T kalınlıkta çekilir; notch: önde altta kertik {d, h}; su yönü dikey */
@@ -2567,8 +2616,20 @@ function buildUpper(m, x0){
     const dg = new THREE.Group(); dg.position.set(px, 0, cd + fT + (th === 'push' ? PUSH_EXTRA : 0)); dg.userData.key = m.uid + ':d' + k; g.add(dg); // push-open: kapak gövdeden 3 mm önde (TIP-ON pimi)
     const xi = R ? x0 + W - T : x0 + T, si = R ? -1 : 1;
     hingeYs(y0, y1, [], sys.map(ay => [bottomY + ay - T/2, bottomY + ay + T/2])).forEach(hy => buildHinge(g, dg, {xi, si, sgn, hy, cd, fT, T, gap, px, z155: false})); // raflara değmez
-    const mz = m.mirrorDoor ? 4 : 0, glass = upperGlass(m), F = UPPER_FRAME, yc = (y0 + y1)/2;
-    if (glass){ // camlı kapak: TEK PARÇA 5 cm çerçeve (kapak plakası, ortası boşaltılmış; birleşim çizgisi yok) + arkadan lambaya oturan 4 mm cam
+    const mz = m.mirrorDoor ? 4 : 0, glass = upperGlass(m), alu = aluGlass(m), F = glassFrameW(m), yc = (y0 + y1)/2;
+    if (alu){ // alüminyum çerçeveli cam kapak: mat siyah profil İKİ KADEMELİ — önde görünen 20 mm (ALU_FRAME, ALU_FRONT_D derin), arkada menteşe kabını taşıyan ALU_BACK (45 mm) geniş kanat; füme cam öndeki kademede
+      const xa = Math.min(0, sgn*dw), xb = Math.max(0, sgn*dw);
+      const am = M.aluFrame || (M.aluFrame = new THREE.MeshStandardMaterial({color: srgb('#1b1c1e'), metalness: .45, roughness: .62, envMapIntensity: .35}));
+      const ring = (w, z0, z1) => { const sh = new THREE.Shape(), ho = new THREE.Path(); // dikdörtgen çerçeve: w en, z0..z1 (kapak önü 0)
+        sh.moveTo(xa, y0); sh.lineTo(xb, y0); sh.lineTo(xb, y1); sh.lineTo(xa, y1); sh.lineTo(xa, y0);
+        ho.moveTo(xa + w, y0 + w); ho.lineTo(xa + w, y1 - w); ho.lineTo(xb - w, y1 - w); ho.lineTo(xb - w, y0 + w); ho.lineTo(xa + w, y0 + w); sh.holes.push(ho);
+        const geo = new THREE.ExtrudeGeometry(sh, {depth: z1 - z0, bevelEnabled: false}); geo.translate(0, 0, z0);
+        const fr = new THREE.Mesh(geo, am); fr.castShadow = fr.receiveShadow = true; dg.add(fr);
+        if (ui.edges){ const ol = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), M.edge); ol.raycast = () => {}; dg.add(ol); } };
+      ring(F, -ALU_FRONT_D, 0); ring(ALU_BACK, -fT, -ALU_FRONT_D);
+      const gm = M.glassFume || (M.glassFume = new THREE.MeshStandardMaterial({color: srgb('#2b2d30'), metalness: .1, roughness: .05, transparent: true, opacity: .62, envMapIntensity: 1.2, depthWrite: false}));
+      const gl = box(dw - 2*F + 16, y1 - y0 - 2*F + 16, 4, gm, sgn*dw/2, yc, -ALU_FRONT_D/2, dg); gl.castShadow = false; gl.renderOrder = 3;
+    } else if (glass){ // camlı kapak: TEK PARÇA 5 cm çerçeve (kapak plakası, ortası boşaltılmış; birleşim çizgisi yok) + arkadan lambaya oturan 4 mm cam
       const xa = Math.min(0, sgn*dw), xb = Math.max(0, sgn*dw), sh = new THREE.Shape(), ho = new THREE.Path();
       sh.moveTo(xa, y0); sh.lineTo(xb, y0); sh.lineTo(xb, y1); sh.lineTo(xa, y1); sh.lineTo(xa, y0);
       ho.moveTo(xa + F, y0 + F); ho.lineTo(xa + F, y1 - F); ho.lineTo(xb - F, y1 - F); ho.lineTo(xb - F, y0 + F); ho.lineTo(xa + F, y0 + F); sh.holes.push(ho);
@@ -2598,9 +2659,9 @@ function buildUpper(m, x0){
     const ls = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W + 8, H + 8, D + 8)), M.sel); ls.position.set(cx, bottomY + H/2, D/2); g.add(ls);
   }
 }
-/* Blum LEGRABOX: 12,8 mm düz metal yanlar (üstte bordür), ahşap arkalık ve 16 mm taban (gövde malzemesinde),
+/* Blum LEGRABOX: 12,8 mm düz metal yanlar (üstte bordür), ahşap arkalık ve taban gövde plakasından (lam / lake 18, kaplama 19 mm),
    iç ön panel yok (kapak ön bağlantı parçasıyla doğrudan kutuya bağlanır). Yan yükseklikleri standart kademeler. */
-const LGB = {side:12.8, bottom:16, back:16, run:16, // ahşap arkalık yanla hemyüz (drawerBox bh = yan − taban), Blum'un M 63 / C 148 ölçüsü kullanılmaz
+const LGB = {side:12.8, run:16, // (taban ve arkalık gövde plakasından: matT(body)) // ahşap arkalık yanla hemyüz (drawerBox bh = yan − taban), Blum'un M 63 / C 148 ölçüsü kullanılmaz
    color:'Carbon black', H:[['N', 68.5], ['M', 90.5], ['K', 128.5], ['C', 177], ['F', 241]]};
 const lgbFor = h => LGB.H.filter(v => v[1] <= h).pop() || LGB.H[0]; // boşluğa sığan en yüksek kademe (iç çekmece)
 /* kullanılan boylar yalnız M ve C: tezgah altı (üst) çekmece hep M; alttakiler C'ye yer varsa C, yoksa M */
@@ -2758,15 +2819,6 @@ function frontTrim(dg, x0, x1, y0, y1, zf, mat){ // kapak tipi çıtası (çerç
     const ml = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), M.edge); ml.raycast = () => {}; dg.add(ml);
   }
 }
-/* kapamada baza kertiği: kapama bir baza koşusunun içinde kalıyorsa (bazalı iki modül arası) bazanın geçtiği bölge (alttan PLINTH,
-   bazanın arka yüzünden öne kadar) kapamadan çıkarılır. Dönüş: {y0, y1, z0, z1} veya null */
-function sideBazaNotch(c, m, x0, t, mx){
-  if (!onBase(m)) return null;
-  const inRun = plinthRuns(c, mx).some(r => r.x0 < x0 + t - .5 && r.x1 > x0 + .5);
-  if (!inRun) return null;
-  const fT = matT(c.front.mat);
-  return {y0: -1, y1: PLINTH, z0: c.depth - 40 - fT - 1, z1: c.depth + sideFrontExtra(c) + 1};
-}
 function buildSides(mx){
   const c = cfg, mat = c.sides.mat === 'body' ? panelMat(c.body.mat, c.body.color) : panelMat(c.front.mat, c.front.color, c.front.fin);
   c.modules.forEach(m => ['left', 'right'].forEach(k => { // üst modül kapaması eviye hazne kesiminden etkilenmez (carve noBasin)
@@ -2778,20 +2830,13 @@ function buildSides(mx){
       // düğmeler en uzun parçanın altında: tek plakada plakanın ortası, profilde en derin bacağın ortası
       const deepOut = !single && lg0.out > lg0.in, len = single ? sd : Math.max(lg0.in, lg0.out);
       const px = single ? x0 + t/2 : ((k === 'left') === deepOut ? x0 + p0/2 : x0 + t - p0/2);
-      [sd - Math.min(100, len/2), sd - len + Math.min(100, len/2)].forEach(z => pabucAt(px, z, g));
+      const pi = pabucIn(len); [sd - pi, sd - len + pi].forEach(z => pabucAt(px, z, g)); // biri önde, biri arkada (L profilde 150 mm bacağın iki ucunda; kullanıcı 2026-11-10)
     }
-    // baza bu kapamanın altından geçiyorsa (yan yana bazalı modüller arası) kapama baza yüksekliğine kadar kertilir
-    const notch = sideBazaNotch(c, m, x0, t, mx);
-    const cut = notch ? [Object.assign({x0: x0 - 1, x1: x0 + t + 1}, notch)] : [];
-    if (sideSingle(c, t)) carve(t, y1 - y0, sd, mat, x0 + t/2, (y0 + y1)/2, sd/2, g, cut, false, isUpper(m)); // tek plaka
+    // baza kertiği yok: aradaki kapama da dıştaki gibi yere kadar tam, baza iki yandan ona dayanır (plinthRuns)
+    if (sideSingle(c, t)) carve(t, y1 - y0, sd, mat, x0 + t/2, (y0 + y1)/2, sd/2, g, [], false, isUpper(m)); // tek plaka
     else { // dönülerek yapılan profil (üstten kesit): ön yüz + dolaba dayalı bacak (+ dış bacak J/U)
       const shape = m.sides[k].shape || 'L', p = sidePlate(c, t, shape), H = y1 - y0, yc = (y0 + y1)/2, lg = sideLegs(shape, sd);
-      const inX = k === 'left' ? x0 + t - p/2 : x0 + p/2, outX = k === 'left' ? x0 + p/2 : x0 + t - p/2; // dolap tarafı / dış taraf
-      if (cut.length){ // baza kertiği olan kapamada (bazalı modüller arası) kertme için kutu parçalar
-        carve(t, H, p, mat, x0 + t/2, yc, sd - p/2, g, cut, false, isUpper(m));                                    // ön yüz
-        carve(p, H, lg.in - p, mat, inX, yc, sd - p - (lg.in - p)/2, g, cut, false, isUpper(m));                  // dolaba dayalı bacak
-        if (lg.out) carve(p, H, lg.out - p, mat, outX, yc, sd - p - (lg.out - p)/2, g, cut, false, isUpper(m));   // dış bacak
-      } else {
+      {
         // dönüşler 45° GÖNYE: üstten kesit çokgenleri, dikey çekilir. xo: dış kenar, xi: dolap tarafı kenar, d: dıştan içe yön
         const xo = k === 'left' ? x0 : x0 + t, xi = k === 'left' ? x0 + t : x0, d = Math.sign(xi - xo), zf = sd, zb = sd - p;
         const tile = mat.userData && mat.userData.tile;
@@ -3216,7 +3261,7 @@ function buildDims(mx){
   // modül kodları: hepsi dolabın önünde yere yapışık (yatay)
   c.modules.forEach((m, i) => {
     const r = mx.map[m.uid], {H} = moduleDims(m);
-    const sp = textPlane(`M${i+1} · ${+(m.width/10).toFixed(1)}×${+(H/10).toFixed(1)}`, 50);
+    const sp = textPlane(`M${i+1} · ${+(m.width/10).toFixed(1)}×${+(dispH(m)/10).toFixed(1)}`, 50);
     if (isUpper(m)){ sp.position.set((r.x0 + r.x1)/2, moduleDims(m).bottomY - 50, TYPES[m.type].D + 20); g.add(sp); return; } // üst modül: etiketi altında, önde
     sp.rotation.x = -Math.PI/2; sp.position.set((r.x0 + r.x1)/2, 2, c.depth + 70);
     g.add(sp);
@@ -3271,7 +3316,8 @@ function frontIcon(k){
     duz: '',
     oval: '<rect x="9" y="8" width="22" height="12" rx="1" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round"/>',
     kose: '<rect x="9" y="8" width="22" height="12" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="miter"/>',
-    serit: [7, 12, 17, 22, 27, 32].map(x => `<line x1="${x}" x2="${x}" y1="4" y2="24" stroke="var(--accent)" stroke-width="2"/>`).join('')
+    serit: [7, 12, 17, 22, 27, 32].map(x => `<line x1="${x}" x2="${x}" y1="4" y2="24" stroke="var(--accent)" stroke-width="2"/>`).join(''),
+    alu: '<rect x="4.5" y="4.5" width="31" height="19" fill="#4a4d52" fill-opacity=".55" stroke="#151515" stroke-width="3"/>' // alüminyum çerçeve + füme cam
   };
   return `<svg viewBox="0 0 40 28" aria-hidden="true">${fr}${P[k]}</svg>`;
 }
@@ -3326,23 +3372,26 @@ function renderLeft(){
       ${(() => { // kapağı hep düz modül (elcikli boy dolap, camlı üst modül) seçiliyken kapak tipi pasif: yalnız düz (frontLocked)
         const selE = (c.modules.find(x => x.uid === ui.sel) || null), lockE = frontLocked(selE), lockN = lockE ? (upperGlass(selE) ? 'Camlı üst modülde' : 'Elcikli boy dolapta') : '';
         const locked = [c.modules.some(tallElcik) && 'elcikli boy dolapta', c.modules.some(upperGlass) && 'camlı üst modülde'].filter(Boolean);
-        return `<div class="ftypes">${Object.entries(FRONT_STYLES).map(([k, v]) => `<button data-act="set" data-k="front.style" data-v="${k}" aria-pressed="${lockE ? k === 'duz' : c.front.style === k}" title="${lockE && k !== 'duz' ? lockN + ' yalnız düz kapak' : v}"${lockE ? ' disabled style="opacity:' + (k === 'duz' ? 1 : .4) + ';cursor:not-allowed"' : ''}>${frontIcon(k)}<span>${v}</span></button>`).join('')}</div>`
+        if (selE && upperGlass(selE)) return `<div class="ftypes">${[['ahsap', 'duz', `Ahşap çerçeve`], ['alu', 'alu', `Alüminyum çerçeve`]].map(([v, ic, n]) => `<button data-act="mset" data-k="glassFrame" data-v="${v}" aria-pressed="${(selE.glassFrame || 'ahsap') === v}">${frontIcon(ic)}<span>${n}</span></button>`).join('')}</div>`
+          + `<p class="hint" style="margin:6px 0 0">Camlı üst modülde kapak: ahşap çerçeve (${UPPER_FRAME/10} cm, kapak malzemesi, şeffaf cam) ya da alüminyum çerçeve (önde ${ALU_FRAME} mm mat siyah, arkada ${ALU_BACK} mm menteşe kanadı, füme cam); çıta olmaz. Diğer modüllerin kapak tipini değiştirmek için başka bir modül seçin ya da seçimi kaldırın.</p>`; // camlı üst modülün çerçevesi modüle özel (kullanıcı 2026-11-10)
+        return `<div class="ftypes">${Object.entries(FRONT_STYLES).filter(([k]) => !lockE || k === 'duz').map(([k, v]) => `<button data-act="set" data-k="front.style" data-v="${k}" aria-pressed="${lockE ? k === 'duz' : c.front.style === k}" title="${v}"${lockE ? ' disabled style="opacity:1;cursor:default"' : ''}>${frontIcon(k)}<span>${v}</span></button>`).join('')}</div>`
+          + (selE && isUpper(selE) && selE.mirrorDoor ? `<p class="hint" style="margin:6px 0 0">M${c.modules.indexOf(selE) + 1} aynalı kapaklı: ön yüz ayna, kapak tipi (çıta) bu modüle uygulanmaz.</p>` : '') // tam tarama 2026-11-10
           + (lockE ? `<p class="hint" style="margin:6px 0 0">${lockN} yalnız düz kapak (çıta olmaz). Diğer modüllerin kapak tipini değiştirmek için başka bir modül seçin ya da seçimi kaldırın.</p>`
             : locked.length ? `<p class="hint" style="margin:6px 0 0">${locked.join(' ve ').replace(/^./, s => s.toUpperCase())} kapak her zaman düz${c.front.style !== 'duz' ? '; seçilen kapak tipi diğer modüllere uygulanır' : ''}.</p>` : ''); })()}
       ${c.front.style === 'serit' && !frontLocked(c.modules.find(x => x.uid === ui.sel)) ? `<div class="seg" style="margin-top:8px">${Object.entries(STRIP_DIR).map(([k, v]) => `<button data-act="set" data-k="front.stripDir" data-v="${k}" aria-pressed="${c.front.stripDir === k}">${v}</button>`).join('')}</div>` : ''}</section>
     ${(() => { // tutamak seçili modüle göre: boy dolap seçiliyse onunki, değilse tezgah altı modüllerinki
-      const sm = c.modules.find(x => x.uid === ui.sel), anyTall = c.modules.some(isTall);
+      const sm = c.modules.find(x => x.uid === ui.sel), anyTall = c.modules.some(isTall), anyUp = c.modules.some(isUpper);
       if (sm && tallElcik(sm)) return `<section><h2 class="sec">Kulp Tipi</h2><div class="swname">Elcik · tek tip</div><p class="hint" style="margin:6px 0 0">Elcikli boy dolapta (B2) elcik tek kapağın birleşim kenarında oyuk; hangi kapakta olacağı Modül panelinden (Sol / Sağ kapakta) seçilir. Kulp tipi seçimi yok.</p></section>`;
       if (sm && tallGolaOnly(sm)) return `<section><h2 class="sec">Kulp Tipi</h2>
           <div class="seg">${Object.entries(KANAL_FIN).map(([k, v]) => `<button data-act="mset" data-k="kanalFin" data-v="${k}" aria-pressed="${sm.kanalFin === k}">${v}</button>`).join('')}</div>
           <div class="swname">${sm.kanalFin === 'front' ? 'Ahşap profil · ' + colorName(c.front.mat, c.front.color) : 'Alüminyum profil · siyah görünür'}</div>
           <p class="hint" style="margin:6px 0 0">${tallPair(sm) ? 'Çift kapaklı boy dolapta (B2) kulp tipi her zaman ortada dikey gola' : 'İki kapaklı boy dolapta (B1) kulp tipi her zaman iki kapak arasında gola'}; başka kulp seçilemez.</p></section>`;
       if (sm && isUpper(sm)) return handleSection(c, 'Kulp Tipi', sm, 'handle', 'handleColor', 'kanalFin')
-          + `<p class="hint" style="margin:-6px 0 0">Üst modülün kulp tipi kendine özel. Gola gövdenin altında: kapak profili örter, kapak alttan tutulur. Aynalı kapak Modül panelinden seçilir.</p>`;
+          + `<p class="hint" style="margin:-6px 0 0">Üst modülün kulp tipi kendine özel. Gola gövdenin altında: kapak profili örter, kapak alttan tutulur.${upperGlass(sm) ? '' : ' Aynalı kapak Modül panelinden seçilir.'}</p>`;
       return sm && isTall(sm) ? handleSection(c, 'Kulp Tipi', sm, 'handle', 'handleColor', 'kanalFin', tallNoGola(sm))
           + (tallNoGola(sm) ? `<p class="hint" style="margin:-6px 0 0">Tek kapaklı boy dolapta gola olmaz.</p>` : '')
         : handleSection(c, 'Kulp Tipi', c, 'handle', 'handleColor', 'kanalFin')
-          + (anyTall ? '<p class="hint" style="margin:-6px 0 0">Boy dolabın kulp tipini değiştirmek için 3B görünümde boy dolabı seçin.</p>' : ''); })()}`;
+          + (anyTall || anyUp ? `<p class="hint" style="margin:-6px 0 0">Bu seçim tezgah altı modüllere uygulanır. ${[anyTall && 'boy dolabın', anyUp && 'üst modülün'].filter(Boolean).join(' ve ').replace(/^./, s => s.toUpperCase())} kulp tipi kendine özel; değiştirmek için 3B görünümde o modülü seçin.</p>` : ''); })()}`;
   } else if (tab === 'kapama'){
     const km = c.modules.find(x => x.uid === ui.sel), ki = c.modules.indexOf(km);
     const sideBox = (k, label) => { const s = km.sides[k]; return `<section class="box">
@@ -3365,7 +3414,7 @@ function renderLeft(){
       km ? `<div class="row sp"><h3 class="ttl">M${ki + 1} · ${TYPES[km.type].label}</h3><span class="tag">${km.width/10} cm</span></div>` + sideBox('left', 'Sol yan kapama') + sideBox('right', 'Sağ yan kapama') + topBox()
       : '<p class="hint" style="margin:0">Kapama eklemek için 3B görünümde veya alttaki M etiketlerinden bir modül seçin. Her modülün sol ve sağ kapaması ayrı seçilir.</p>') +
       `<section><h2 class="sec">Kapama malzemesi</h2><div class="seg"><button data-act="side-mat" data-v="front" aria-pressed="${c.sides.mat === 'front'}">Kapakla aynı</button><button data-act="side-mat" data-v="body" aria-pressed="${c.sides.mat === 'body'}">Gövdeyle aynı</button></div></section>
-      <p class="hint" style="margin:0">Sayıyı yazıp Enter'a basın veya hazır ölçülerden seçin. İnce plakadan (9 / 8 mm) kalın kapamalar seçilen dönüş şekliyle (L / J / U) 45° gönyeli parçalar olarak parça listesine yazılır. Kapama seçili modüle aittir: tezgah altı modülde tezgah kapamanın üstünü de örter; boy dolapta ve üst modülde onun boyunda ve derinliğindedir. Malzeme seçimi tüm kapamalar için ortaktır. Toplam genişlik kapamalarla birlikte hesaplanır.</p>`;
+      <p class="hint" style="margin:0">Sayıyı yazıp Enter'a basın veya hazır ölçülerden seçin. Kalın kapamalar kalınlığa ve şekle göre 9 / 8 ya da 19 / 18 mm plakadan, seçilen dönüş şekliyle (L / J / U) 45° gönyeli parçalar olarak parça listesine yazılır. Kapama seçili modüle aittir: tezgah altı modülde tezgah kapamanın üstünü de örter; boy dolapta ve üst modülde onun boyunda ve derinliğindedir. Malzeme seçimi tüm kapamalar için ortaktır. Toplam genişlik kapamalarla birlikte hesaplanır.</p>`;
   } else {
     // TEZGAH: modül listesi yok (kullanıcı 2026-10-21) — seçili tezgah altı modül(ler) için tek "Tezgah" onay kutusu (data-topsel)
     const cms = ctrMods(c), tsel = cms.filter(m => ui.selSet.has(m.uid)), selM = c.modules.find(x => x.uid === ui.sel);
@@ -3378,7 +3427,7 @@ function renderLeft(){
     <section><h2 class="sec">Renk</h2>
       <div class="sw">${TOPS.map(t => `<button data-act="set" data-k="top.color" data-v="${t.id}" aria-pressed="${c.top.color === t.id}" title="${t.name}" style="${topSwatch(t)}"></button>`).join('')}</div>
       <div class="swname">${topById(c.top.color).name}</div></section>
-    <p class="hint" style="margin:0">Porselen tezgah tezgahlı modüllerin üstünde tek parça. Kalınlık değişince askı modüller aşağı iner; tezgah üstü 90 cm (çanak lavabo tezgahın üstüne oturur). C3 (bazalı) modül varsa tezgah onun üstüne oturur. Boy dolap tezgahın yanında durur.</p></div>`;
+    <p class="hint" style="margin:0">Porselen tezgah yan yana tezgahlı modüllerde tek parça; modüller arası boşlukta, tezgahsız modülde ve boy dolapta kesilir. Çanak lavabo yoksa tezgah üstü 90 cm; çanak varsa çanağın üst kenarı 90 cm olacak şekilde tezgah iner. C3 (bazalı) modül varsa tezgah onun üstüne oturur. Kalınlık değişince askı modüller ona göre iner.</p></div>`;
   }
   const pb = L_.querySelector('.pbody'), st = pb && L_.dataset.tab === tab ? pb.scrollTop : 0; // aynı sekmede kaydırma korunur
   L_.innerHTML = ptabs('ltab', tab, [['modul', 'Modül'], ['malzeme', 'Malzeme'], ['kapama', 'Kapama'], ['tezgah', 'Tezgah']]) + `<div class="pbody">${body}</div>`;
@@ -3426,7 +3475,7 @@ function mirrorEditor(mi){
   const id = mi.uid;
   return `<div class="box">
     <div class="field"><label for="mi-sh-${id}">Form</label><select id="mi-sh-${id}" data-mi="${id}" data-f="shape">${Object.entries(MIRRORS).map(([k, v]) => `<option value="${k}" ${mi.shape === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-    ${miField(id, 'w', mi.shape === 'yuvarlak' ? 'Çap' : 'Genişlik', mi.w, 300, 2400)}
+    ${miField(id, 'w', mi.shape === 'yuvarlak' ? 'Çap' : 'Genişlik', mi.w, 300, mi.shape === 'yuvarlak' ? 2000 : 2400)}
     ${mi.shape !== 'yuvarlak' ? miField(id, 'h', 'Yükseklik', mi.h, 300, 2000) : ''}
     ${miField(id, 'x', 'Yatay konum', mi.x, -3000, 3000)}
     ${miField(id, 'bottom', 'Alt kenar yerden', mi.bottom, 600, 2000)}
@@ -3468,7 +3517,7 @@ function renderRight(){
     else if (isUpper(m)){ // üst modül: ölçü, konum (yatay / yerden), menteşe (U1), aynalı kapak
       const {H, bottomY} = moduleDims(m), Tu = TYPES[m.type];
       body = `<div class="row sp"><h3 class="ttl">M${i+1} · ${Tu.label}</h3><span class="tag">${m.width/10}×${H/10}×${Tu.D/10}</span></div>
-      <p class="hint" style="margin:-8px 0 0">${Tu.pair ? 'İki kapak (sol soldan, sağ sağdan menteşeli)' : 'Tek kapak'}${upperGlass(m) ? ', camlı' : ''} · ${upperShelves(m).length} ayarlı raf · ${m.handle === 'kanal' ? 'Gola (gövde altında)' : HANDLES[m.handle]}</p>
+      <p class="hint" style="margin:-8px 0 0">${Tu.pair ? 'İki kapak (sol soldan, sağ sağdan menteşeli)' : 'Tek kapak'}${aluGlass(m) ? ', alüminyum çerçeveli camlı' : upperGlass(m) ? ', camlı' : ''} · ${upperShelves(m).length} ayarlı raf · ${m.handle === 'kanal' ? 'Gola (gövde altında)' : HANDLES[m.handle]}</p>
       <div>
       <div class="field"><label for="m-type">Modül</label><select id="m-type" data-m="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${m.type === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></div>
       ${wField('m-width', 'm', m.width, Tu.Wmin, Tu.Wmax, Tu.Wstep)}<p class="hint" style="margin:-6px 0 10px">Derinlik sabit ${Tu.D/10} cm</p>
@@ -3477,9 +3526,9 @@ function renderRight(){
       <div class="seg"><button data-act="hinge" data-v="L" aria-pressed="${m.hinge === 'L'}">Soldan</button><button data-act="hinge" data-v="R" aria-pressed="${m.hinge !== 'L'}">Sağdan</button></div>`}
       <div class="lbl" style="margin:10px 0 6px">Kapak</div>
       <div class="seg">${LAYOUTS[m.type].map(l => `<button data-act="mset" data-k="layout" data-v="${l.id}" aria-pressed="${m.layout === l.id}">${l.glass ? 'Camlı' : 'Düz'}</button>`).join('')}</div>
-      ${upperGlass(m) ? `<p class="hint" style="margin:6px 0 0">${UPPER_FRAME/10} cm çerçeve (kapak malzemesi), 4 mm şeffaf temperli cam; kapak her zaman düz (çıta olmaz), ayna uygulanmaz.</p>`
+      ${upperGlass(m) ? `<p class="hint" style="margin:6px 0 0">${aluGlass(m) ? `Alüminyum çerçeve: mat siyah, önde ${ALU_FRAME} mm, arkada ${ALU_BACK} mm menteşe kanadı; 4 mm füme temperli cam` : `${UPPER_FRAME/10} cm çerçeve (kapak malzemesi), 4 mm şeffaf temperli cam`}; çerçeve Malzeme sekmesinde Kapak tipi’nden seçilir, çıta ve ayna olmaz.</p>`
         : `<label class="check" style="margin-top:10px"><input type="checkbox" id="m-mirror" data-m="mirrorDoor" ${m.mirrorDoor ? 'checked' : ''}>Aynalı kapak</label>`}
-      <div class="field" style="margin-top:10px"><label for="m-x">Yatay konum (orta çizgi) <output>${m.x} mm</output></label><input type="range" id="m-x" min="-3000" max="3000" step="10" value="${m.x}" data-m="x"></div>
+      <div class="field" style="margin-top:10px"><label for="m-x">Yatay konum (orta çizgi) <output>${m.x} mm</output></label><input type="range" id="m-x" min="${-UPPER_XMAX}" max="${UPPER_XMAX}" step="10" value="${m.x}" data-m="x"></div>
       <div class="field"><label for="m-bottom">Alt kenar yerden <output>${bottomY} mm</output></label><input type="range" id="m-bottom" min="0" max="${2400 - m.height}" step="10" value="${bottomY}" data-m="bottom"></div>
       <div class="row" style="margin-bottom:10px"><button class="btn sm" data-act="upper-fit" data-v="c">Tezgahın ortasına al</button><button class="btn sm" data-act="upper-fit" data-v="h">Tezgahın 50 cm üstüne</button></div>
       ${grainUI(c, m)}
@@ -3515,15 +3564,15 @@ function renderRight(){
       ${grainUI(c, m)}
       </div>
       <div class="row">
-        <button class="btn sm" data-act="move" data-d="-1" ${i === 0 ? 'disabled' : ''}>← Sola</button>
-        <button class="btn sm" data-act="move" data-d="1" ${i === c.modules.length - 1 ? 'disabled' : ''}>Sağa →</button>
+        <button class="btn sm" data-act="move" data-d="-1" ${moveOff(c, i, -1) ? 'disabled' : ''}>← Sola</button>
+        <button class="btn sm" data-act="move" data-d="1" ${moveOff(c, i, 1) ? 'disabled' : ''}>Sağa →</button>
         <button class="btn sm" data-act="dup">Kopyala</button>
         <button class="btn sm danger" data-act="del-mod">Sil</button>
       </div>`;
     }
     else {
       const L = layoutOf(m), hs = drawerHeights(m), s = sinkOver(m, c), {H, bottomY} = moduleDims(m);
-      body = `<div class="row sp"><h3 class="ttl">M${i+1} · ${TYPES[m.type].label}</h3><span class="tag">${m.width/10}×${Math.round(H/10)}×${c.depth/10}</span></div>
+      body = `<div class="row sp"><h3 class="ttl">M${i+1} · ${TYPES[m.type].label}</h3><span class="tag">${m.width/10}×${Math.round(dispH(m)/10)}×${c.depth/10}</span></div>
       <p class="hint" style="margin:-8px 0 0">${onBase(m) ? 'Bazalı, 10 cm baza · kapaktan 4 cm geride' : `Alt kenar yerden ${Math.round(bottomY/10)} cm`}${s ? ' · üstünde lavabo var' : ''}</p>
       <div>
       <div class="field"><label for="m-type">Modül</label><select id="m-type" data-m="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${m.type === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></div>
@@ -3537,8 +3586,8 @@ function renderRight(){
       ${hs.map((h, k) => `<div class="field"><label for="m-org-${k}">Çekmece ${k+1} · ${+(h/10).toFixed(1)} cm ${s && k === 0 ? '<span class="tag">U kesim</span>' : ''}</label>
         <select id="m-org-${k}" data-org="${k}">${['yok', ...orgOpts(m.width)].map(ok => [ok, ORGS[ok]]).map(([ok, ov]) => `<option value="${ok}" ${(m.org[k] || 'yok') === ok ? 'selected' : ''}>${ov.label}</option>`).join('')}</select></div>`).join('')}</div>
       <div class="row">
-        <button class="btn sm" data-act="move" data-d="-1" ${i === 0 || isTall(c.modules[i - 1]) ? 'disabled' : ''}>← Sola</button>
-        <button class="btn sm" data-act="move" data-d="1" ${i === c.modules.length - 1 || isTall(c.modules[i + 1]) ? 'disabled' : ''}>Sağa →</button>
+        <button class="btn sm" data-act="move" data-d="-1" ${moveOff(c, i, -1) ? 'disabled' : ''}>← Sola</button>
+        <button class="btn sm" data-act="move" data-d="1" ${moveOff(c, i, 1) ? 'disabled' : ''}>Sağa →</button>
         <button class="btn sm" data-act="dup">Kopyala</button>
         <button class="btn sm danger" data-act="del-mod">Sil</button>
       </div>`;
@@ -3546,7 +3595,7 @@ function renderRight(){
   } else if (tab === 'lavabo'){
     const ss = c.sinks.find(s => s.uid === ui.selSink);
     const selM = c.modules.find(x => x.uid === ui.sel), firstTop = ctrMods(c).find(modTop), tgt = ss ? ss.module : (modTop(selM) ? selM.uid : firstTop?.uid); // lavabonun gideceği modül (yalnız tezgahlı)
-    const selNoTop = !ss && selM && !isTall(selM) && !modTop(selM); // seçili modülde tezgah yok: lavabo konmaz
+    const selNoTop = !ss && selM && !isTall(selM) && !isUpper(selM) && !modTop(selM); // seçili TEZGAH ALTI modülde tezgah yok: lavabo konmaz (boy dolap / üst modül seçiliyken ilk tezgahlı modüle konur)
     const curType = ss ? ss.type : null, intOK = intAllowed(tgt), canSink = !!firstTop && !selNoTop;
     body = `<div><div class="lbl" style="margin-bottom:6px">Lavabo tipi${ss ? ' · seçili lavabo' : ''}</div>
       <div class="seg">${Object.entries(SINKS).map(([k, v]) => `<button data-act="sink-type" data-v="${k}" aria-pressed="${curType === k}" ${canSink && (k !== 'integrated' || intOK) ? '' : 'disabled'}${k === 'integrated' && !intOK ? ` title="Porselen eviye için modül en az ${INT_MIN_W/10} cm olmalı"` : ''}>${v.label}</button>`).join('')}</div>
@@ -3601,10 +3650,10 @@ function renderPos(){
     <div id="pos-warn" style="display:none;padding:6px 12px;font-size:12px;color:var(--bad);background:var(--bad-soft);border-bottom:1px solid var(--line)"></div>
     <div class="pb"><div class="pv"><h4>PLAN (ÜSTTEN)</h4><div class="sv" id="pos-plan"></div></div><div class="pv"><h4>ÖN GÖRÜNÜŞ</h4><div class="sv" id="pos-front"></div></div></div>
     <div class="pf">${sm && isUpper(sm) ? `<b>M${si + 1} · ${TYPES[sm.type].short} · ${sm.width/10} cm</b>
-      <label style="display:flex;align-items:center;gap:6px;margin-left:6px">Yatay <input type="number" id="pos-x-n" min="-300" max="300" step="1" value="${sm.x/10}" style="width:62px;font-family:var(--f-mono)"> cm</label>
+      <label style="display:flex;align-items:center;gap:6px;margin-left:6px">Yatay <input type="number" id="pos-x-n" min="${-UPPER_XMAX/10}" max="${UPPER_XMAX/10}" step="1" value="${sm.x/10}" style="width:62px;font-family:var(--f-mono)"> cm</label>
       <label style="display:flex;align-items:center;gap:6px;margin-left:6px">Yerden <input type="range" id="pos-bot" min="0" max="${2400 - sm.height}" step="10" value="${sm.bottom}" style="width:120px"><input type="number" id="pos-bot-n" min="0" max="${(2400 - sm.height)/10}" step="1" value="${sm.bottom/10}" style="width:62px;font-family:var(--f-mono)"> cm</label>`
       : sm ? `<b>M${si + 1} · ${TYPES[sm.type].short} · ${sm.width/10} cm</b>
-      <button class="btn sm" data-act="move" data-d="-1" ${si === 0 ? 'disabled' : ''}>← Sola</button><button class="btn sm" data-act="move" data-d="1" ${si === c.modules.length - 1 ? 'disabled' : ''}>Sağa →</button>
+      <button class="btn sm" data-act="move" data-d="-1" ${moveOff(c, si, -1) ? 'disabled' : ''}>← Sola</button><button class="btn sm" data-act="move" data-d="1" ${moveOff(c, si, 1) ? 'disabled' : ''}>Sağa →</button>
       ${sm && si > 0 ? (() => { const g0 = tallNext(sm, c) ? TALL_GAP : 0; // boy dolap yanında en az 10 cm
         return `<label style="display:flex;align-items:center;gap:6px;margin-left:6px">Soldaki boşluk <input type="range" id="pos-gap" min="${g0}" max="${g0 + GAP_MAX}" step="10" value="${g0 + (sm.gapL || 0)}" data-g0="${g0}" style="width:120px"><input type="number" id="pos-gap-n" min="${g0/10}" max="${(g0 + GAP_MAX)/10}" step="1" value="${(g0 + (sm.gapL || 0))/10}" style="width:62px;font-family:var(--f-mono)"> cm</label>`; })() : ''}
       ${sm && isTall(sm) ? `<label style="display:flex;align-items:center;gap:6px;margin-left:6px">Yerden <input type="range" id="pos-bot" min="0" max="1500" step="10" value="${sm.bottom}" style="width:120px"><input type="number" id="pos-bot-n" min="0" max="150" step="1" value="${sm.bottom/10}" style="width:62px;font-family:var(--f-mono)"> cm</label>` : ''}` : '<span>Modül seçili değil</span>'}
@@ -3620,7 +3669,7 @@ function renderPos(){
     bi.addEventListener('change', () => refresh({left:false}));
     bn.addEventListener('change', () => { sm.bottom = clamp(Math.round(+bn.value || 0), 0, +bn.max)*10; refresh({left:false}); }); }
   const xn = el.querySelector('#pos-x-n'); // üst modülün yatay konumu (orta çizgi, cm)
-  if (xn) xn.addEventListener('change', () => { sm.x = clamp(Math.round(+xn.value || 0), -300, 300)*10; refresh({left:false}); });
+  if (xn) xn.addEventListener('change', () => { sm.x = clamp(Math.round(+xn.value || 0), -UPPER_XMAX/10, UPPER_XMAX/10)*10; refresh({left:false}); });
   drawPos(el);
 }
 function drawPos(el){
@@ -3639,7 +3688,7 @@ function drawPos(el){
       const pair = !!TYPES[m.type].pair, gola = isUpper(m) ? m.handle === 'kanal' : tallHandleOf(m, c) === 'kanal';
       if (pair) o += ln(xm, yt, xm, yb, pair && gola && isTall(m) ? 2.4 : 1);
       if (isTall(m) && !pair && !tallOne(m)){ const ys = fy(d.bottomY + tallSplit(m, d.H)); o += ln(x0, ys, x1, ys, gola ? 2.4 : 1); }
-      if (upperGlass(m)){ const F = UPPER_FRAME*s; (pair ? [[x0, xm], [xm, x1]] : [[x0, x1]]).forEach(([a, b]) => o += `<rect x="${a + F}" y="${yt + F}" width="${Math.max(0, b - a - 2*F)}" height="${Math.max(0, yb - yt - 2*F)}" fill="none" stroke="currentColor" stroke-width=".8" opacity=".6"/>`); }
+      if (upperGlass(m)){ const F = glassFrameW(m)*s; (pair ? [[x0, xm], [xm, x1]] : [[x0, x1]]).forEach(([a, b]) => o += `<rect x="${a + F}" y="${yt + F}" width="${Math.max(0, b - a - 2*F)}" height="${Math.max(0, yb - yt - 2*F)}" fill="none" stroke="currentColor" stroke-width=".8" opacity=".6"/>`); }
       if (isUpper(m) && gola) o += ln(x0, yb - 1.2, x1, yb - 1.2, 2.4);
     } else {
       const hs = drawerHeights(m, c), gola = c.handle === 'kanal'; let y = d.topY;
@@ -3721,7 +3770,7 @@ function openPriceDetail(){
     <div class="price" style="max-width:420px">${p.lines.filter(l => l[1] > 0).map(l => `<span>${l[0]}</span><span>${fmtTL(l[1])}</span>`).join('')}
       <span class="muted">Ara toplam</span><span>${fmtTL(p.sub)}</span><span class="muted">KDV %20</span><span>${fmtTL(p.vat)}</span>
       <span class="tot">Toplam</span><span class="tot v">${fmtTL(p.total)}</span></div>
-    <p class="hint">Birim fiyatlar örnektir; gerçek fiyat listesi sonra girilecek.</p>`);
+    <p class="hint">Fiyatlar satış fiyatıdır (€). Tezgah, porselen eviye ve gider, ayna, cam ve lake boyası henüz örnek; çubuk kulp fiyatı geçici; 0 € görünen kalemlerin fiyatı sonra girilecek.</p>`);
 }
 function deleteSelected(){
   if (ui.rightTab === 'ayna' && ui.selMirror){ removeMirror(ui.selMirror); return; }
@@ -3755,6 +3804,17 @@ function addMirror(shape, x){
   const d = mirrorDefaults(shape), mi = {uid: uid(), shape, w: d.w, h: d.h, x, bottom: 1120, led: false};
   cfg.mirrors.push(mi); ui.selMirror = mi.uid; ui.rightTab = 'ayna'; refresh({left:false}); toast(`${MIRRORS[shape]} ayna eklendi`);
 }
+/* TİP DEĞİŞİMİ (tam tarama 2026-11-10): tezgah altı ↔ boy dolap ↔ üst modül arasında grup değişince eski yükseklik / alt kenar / yatay konum taşınmaz,
+   yeni grubun ilk konum kuralları uygulanır (boy dolap yerden TALL_BOTTOM; üst modül tezgahın UPPER_UP üstünde, yatay konumu modülün eski orta çizgisi) */
+function retype(m, type, mx = moduleX()){
+  const grp = t => TYPES[t].upper ? 'u' : TYPES[t].tall ? 't' : 'c', was = grp(m.type), r = mx.map[m.uid];
+  m.type = type; m.layout = LAYOUTS[type][0].id;
+  if (grp(type) === was) return;
+  delete m.height; delete m.bottom; delete m.x; delete m.depth;
+  if (grp(type) !== 'c'){ m.hinge = m.hinge || 'R'; m.handle = m.handle || cfg.handle; m.handleColor = m.handleColor || cfg.handleColor; m.kanalFin = m.kanalFin || cfg.kanalFin; }
+  if (grp(type) === 't') m.bottom = TALL_BOTTOM;
+  if (grp(type) === 'u'){ m.bottom = topH() + UPPER_UP; m.x = r ? Math.round((r.x0 + r.x1)/20)*10 : 0; }
+}
 function addSink(t, target){
   target = modTop(target) ? target : ctrMods(cfg).find(modTop); if (!target) return; // lavabo yalnız tezgahlı modüle (boy dolaba ve tezgahsız modüle konmaz)
   const s = {uid: uid(), type: t, module: target.uid, offset: 0, depth: SINK_DEPTH, drain: 'zarf'}; sinkDefaults(s, t);
@@ -3765,7 +3825,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || b.disabled) return; // pasif düğme (içindeki simgeye tıklansa da) işlem yapmaz
   const a = b.dataset.act, sel = cfg.modules.find(m => m.uid === ui.sel), si = cfg.modules.indexOf(sel);
   // ayna boy dolaba konmaz: boy dolap seçiliyse (veya seçim yoksa) tezgahlı bölümün ortası
-  const selCenter = () => { const mx = moduleX(); if (sel && !isTall(sel)) return Math.round((mx.map[sel.uid].x0 + sel.width/2)/10)*10; return ctrMods(cfg).length ? Math.round((mx.run0 + mx.run1)/20)*10 : 0; };
+  const selCenter = () => { const mx = moduleX(); if (sel && !isTall(sel) && !isUpper(sel)) return Math.round((mx.map[sel.uid].x0 + sel.width/2)/10)*10; return ctrMods(cfg).length ? Math.round((mx.run0 + mx.run1)/20)*10 : 0; };
   switch (a){
     case 'ltab': ui.leftTab = b.dataset.v; renderLeft(); buildScene(); break;
     case 'rtab': ui.rightTab = b.dataset.v; buildScene(); renderRight(); break;
@@ -3776,7 +3836,7 @@ document.addEventListener('click', e => {
       if (TYPES[m.type].upper){ // üst modül: seçili modülün (yoksa tezgahlı bölümün) ortasına, tezgahın 50 cm üstüne; listenin sonuna (dizilimde yer kaplamaz)
         const mx = moduleX(), r = sel && mx.map[sel.uid];
         Object.assign(m, {hinge: 'R', width: TYPES[m.type].W, height: TYPES[m.type].H, bottom: topH() + UPPER_UP, handle: cfg.handle, handleColor: cfg.handleColor, kanalFin: cfg.kanalFin,
-          x: r && isUpper(sel) ? r.x1 + TYPES[m.type].W/2 : r ? Math.round((r.x0 + r.x1)/20)*10 : ctrMods(cfg).length ? Math.round((mx.run0 + mx.run1)/20)*10 : 0});
+          x: r && isUpper(sel) ? r.x1 + r.rt + TYPES[m.type].W/2 : r && !isTall(sel) ? Math.round((r.x0 + r.x1)/20)*10 : ctrMods(cfg).length ? Math.round((mx.run0 + mx.run1)/20)*10 : 0});
         cfg.modules.push(m); ui.sel = m.uid; ui.selSet = new Set([m.uid]); ui.rightTab = 'modul'; refresh(); toast(`${TYPES[m.type].label} eklendi`); break;
       }
       // yer: tezgah altı modül seçili modülün sağına (boy dolap seçiliyse tezgahlı bölümün sonuna), boy dolap dizilimin ucuna
@@ -3803,20 +3863,23 @@ document.addEventListener('click', e => {
       const d = +b.dataset.d, j = si + d; if (j < 0 || j >= cfg.modules.length || isUpper(cfg.modules[j]) || isUpper(sel)) break; // üst modül dizilimde değil
       [cfg.modules[si], cfg.modules[j]] = [cfg.modules[j], cfg.modules[si]]; refresh({left:false}); break; // her modül komşusuyla yer değiştirir (boy dolap da araya girebilir)
     }
-    case 'dup': {
+    case 'dup': { // dizilim modülleri ve üst modüller AYRI kopyalanır (karışık seçimde yer ve kapama doğru kalsın; tam tarama 2026-11-10)
       const ms = cfg.modules.filter(m => ui.selSet.has(m.uid)); if (!ms.length) break;
-      const last = Math.max(...ms.map(m => cfg.modules.indexOf(m)));
-      const copies = ms.map(m => { const n = clone(m); n.uid = uid(); return n; });
-      // kopyalar bitişik eklenir: kopyanın sol kapaması kalkar, son modülün dış (sağ) kapaması son kopyaya geçer
-      copies.forEach(n => { if (n.sides && n.sides.left) n.sides.left.on = false; delete n.gapL; if (isUpper(n)) n.x = (+n.x || 0) + n.width; }); // kopya bitişik gelir (boşluk kopyalanmaz); üst modülün kopyası sağına
-      const lastM = cfg.modules[last]; if (lastM.sides && lastM.sides.right && lastM.sides.right.on && ms.includes(lastM)) lastM.sides.right.on = false;
-      cfg.modules.splice(last + 1, 0, ...copies); ui.selSet = new Set(copies.map(n => n.uid)); ui.sel = copies[copies.length - 1].uid;
+      const rowMs = ms.filter(m => !isUpper(m)), upMs = ms.filter(isUpper), cp = m => { const n = clone(m); n.uid = uid(); if (n.sides && n.sides.left) n.sides.left.on = false; delete n.gapL; return n; };
+      const rowCopies = rowMs.map(cp), upCopies = upMs.map(m => { const n = cp(m); n.x = (+m.x || 0) + m.width + msT(m, 'right'); return n; }); // üst modülün kopyası sağına bitişik (kapaması dahil)
+      if (rowMs.length){ // kopyalar son seçili dizilim modülünün sağına bitişik: kopyanın sol kapaması kalkar, son modülün dış (sağ) kapaması son kopyaya geçer
+        const last = Math.max(...rowMs.map(m => cfg.modules.indexOf(m))), lastM = cfg.modules[last];
+        if (lastM.sides && lastM.sides.right && lastM.sides.right.on) lastM.sides.right.on = false;
+        cfg.modules.splice(last + 1, 0, ...rowCopies);
+      }
+      cfg.modules.push(...upCopies); const copies = [...rowCopies, ...upCopies];
+      ui.selSet = new Set(copies.map(n => n.uid)); ui.sel = copies[copies.length - 1].uid;
       refresh({left:false}); if (copies.length > 1) toast(`${copies.length} modül kopyalandı`); break;
     }
     case 'del-mod': ui.rightTab = 'modul'; deleteSelected(); break;
     case 'sink-type': {
       const ss = cfg.sinks.find(x => x.uid === ui.selSink), t = b.dataset.v;
-      if (!ss && sel && !isTall(sel) && !modTop(sel)){ toast('Bu modülde tezgah yok; tezgahsız modüle lavabo konmaz'); break; }
+      if (!ss && sel && !isTall(sel) && !isUpper(sel) && !modTop(sel)){ toast('Bu modülde tezgah yok; tezgahsız modüle lavabo konmaz'); break; }
       { const tu = ss ? ss.module : (modTop(sel) ? sel.uid : ctrMods(cfg).find(modTop)?.uid);
         if (t === 'integrated' && !intAllowed(tu)){ toast(`Porselen eviye için modül en az ${INT_MIN_W/10} cm olmalı`); break; } }
       if (!ss){ addSink(t, sel); break; }
@@ -3824,8 +3887,8 @@ document.addEventListener('click', e => {
       refresh({left:false}); break;
     }
     case 'add-sink': {
-      // boş modüle yerleşir; üst üste binmez
-      const mx = moduleX(), free = m => !cfg.sinks.some(k => { const r = mx.map[m.uid], x = sinkCenterX(k, cfg, mx); return x > r.x0 - 300 && x < r.x1 + 300; });
+      // lavabosu olmayan modüle yerleşir (lavabo kendi modülüne aittir, s.module; eskiden ±300 mm yakınlık sayılıyordu ve komşusunda lavabo olan boş modül dolu sanılıyordu — tam tarama 2026-11-10)
+      const free = m => !cfg.sinks.some(k => k.module === m.uid);
       const target = (modTop(sel) && free(sel)) ? sel : ctrMods(cfg).find(m => modTop(m) && free(m)); // yalnız tezgahlı modül
       if (!target){ toast('Yeni lavabo için boş, tezgahlı modül yok'); break; }
       const t = cfg.sinks.find(x => x.uid === ui.selSink)?.type || 'integrated';
@@ -3937,10 +4000,10 @@ function onField(e, live){
     return true;
   }
   if (t.dataset.bulk){
-    const f = t.dataset.bulk;
+    const f = t.dataset.bulk, bmx = moduleX(); // konumlar değişimden önce
     cfg.modules.forEach(x => {
       if (!ui.selSet.has(x.uid)) return;
-      if (f === 'type'){ x.type = t.value; x.layout = LAYOUTS[x.type][0].id; }
+      if (f === 'type') retype(x, t.value, bmx);
       else x.layout = t.value;
     });
     refresh({left:false}); return true;
@@ -3954,8 +4017,9 @@ function onField(e, live){
   }
   if (t.dataset.m && m){
     const f = t.dataset.m;
+    if (f === 'type'){ retype(m, t.value); refresh({left:false}); return true; }
     m[f] = f === 'hidden' || f === 'mirrorDoor' ? t.checked : t.value; // genişlik yukarıda ayrı işlenir
-    if (f === 'type') m.layout = LAYOUTS[m.type][0].id;
+
     refresh({left:false}); return true;
   }
   if (t.dataset.org && m){ m.org[t.dataset.org] = t.value; refresh({left:false}); return true; }
@@ -4141,6 +4205,8 @@ function renderOrders(){
         <dt>Kapak</dt><dd>${MATS[oc.front.mat].label} · ${colorName(oc.front.mat, oc.front.color)} · ${frontStyleText(oc.front)}</dd>
         <dt>Kulp tipi</dt><dd>${handleColorText(oc)}</dd>
         <dt>Tezgah</dt><dd>${hasTop(oc) ? `${topById(oc.top.color).name} · ${oc.top.t} mm` : 'Yok'}${(() => { const no = oc.modules.map((m, i) => !isTall(m) && !isUpper(m) && !modTop(m) ? `M${i+1}${panelOn(m) ? ' (üst panel)' : ''}` : '').filter(Boolean); return hasTop(oc) && no.length ? ` · tezgahsız: ${no.join(', ')}` : !hasTop(oc) && oc.modules.some(panelOn) ? ` · üst panel: ${oc.modules.map((m, i) => panelOn(m) ? 'M' + (i + 1) : '').filter(Boolean).join(', ')}` : ''; })()}</dd>
+        <dt>Lavabo</dt><dd>${esc(oc.sinks.map(s => { const i = oc.modules.findIndex(m => m.uid === s.module); // model / renk ve gider tipi (tam tarama 2026-11-10)
+          return `M${i + 1}: ` + (s.type === 'integrated' ? `Porselen entegre eviye ${(+s.w || 0)/10} × ${(+s.d || 0)/10} cm · ${DRAINS[s.drain] || ''}` : vesselName(s)) + ' · ' + (s.faucet === 'delikli' ? 'tezgahta batarya deliği' : 'duvar bataryası'); }).join(', ') || '—')}</dd>
         <dt>Yan kapama</dt><dd>${sidesText(oc)}</dd>
         <dt>Aynalar</dt><dd>${oc.mirrors.map(m => `${esc(MIRRORS[m.shape] || '')} ${+m.w || 0}×${+m.h || 0}${m.led ? ' · ' + LED_TXT : ''}`).join(', ') || '—'}</dd>
         <dt>Tutar</dt><dd class="mono">${fmtTL(o.total || p.total)} <span class="muted">KDV dahil</span></dd></dl></div>
@@ -4156,8 +4222,8 @@ function renderOrders(){
     <h2 class="sec" style="margin-top:20px">Modüller</h2>
     <div class="tbl-wrap"><table><thead><tr><th>Modül</th><th>Tip</th><th>Dizilim</th><th>G × Y × D (cm)</th><th>Özellik</th></tr></thead><tbody>
       ${oc.modules.map((m, i) => { const mx = moduleX(oc), s = sinkOver(m, oc), dm = moduleDims(m, oc);
-        return `<tr><td class="mono">M${i+1}</td><td>${TYPES[m.type].label}</td><td>${(LAYOUTS[m.type].find(l => l.id === m.layout) || {}).name || ''}</td><td class="mono">${m.width/10} × ${Math.round(dm.H/10)} × ${(isTall(m) || isUpper(m) ? modD(m) : oc.depth)/10}</td>
-        <td>${[m.hidden ? 'Gizli Çekmece' : '', tallIdr(m).length ? 'İç çekmece: ' + tallIdr(m).join(' · ') : '', s ? 'U kesim (lavabo)' : '', Object.entries(m.org || {}).filter(([k, x]) => +k < drawerHeights(m, oc).length && x && x !== 'yok' && ORGS[x]).map(([, x]) => ORGS[x].label).join(', ')].filter(Boolean).join(' · ') || '—'}</td></tr>`; }).join('')}
+        return `<tr><td class="mono">M${i+1}</td><td>${TYPES[m.type].label}</td><td>${(LAYOUTS[m.type].find(l => l.id === m.layout) || {}).name || ''}</td><td class="mono">${m.width/10} × ${Math.round(dispH(m, oc)/10)} × ${(isTall(m) || isUpper(m) ? modD(m) : oc.depth)/10}</td>
+        <td>${[upperGlass(m) ? (aluGlass(m) ? 'Camlı kapak · alüminyum çerçeve (mat siyah), füme cam' : `Camlı kapak · ahşap çerçeve ${UPPER_FRAME/10} cm`) : isUpper(m) && m.mirrorDoor ? 'Aynalı kapak' : '', m.hidden ? 'Gizli Çekmece' : '', tallIdr(m).length ? 'İç çekmece: ' + tallIdr(m).join(' · ') : '', s ? 'U kesim (lavabo)' : '', Object.entries(m.org || {}).filter(([k, x]) => +k < drawerHeights(m, oc).length && x && x !== 'yok' && ORGS[x]).map(([, x]) => ORGS[x].label).join(', ')].filter(Boolean).join(' · ') || '—'}</td></tr>`; }).join('')}
     </tbody></table></div>`;
 }
 document.getElementById('o-search').addEventListener('input', e => { ui.search = e.target.value; renderOrders(); });
@@ -4174,8 +4240,8 @@ document.addEventListener('click', async e => {
     case 'back': { const k = stIdx(o.status); if (k > 0) await setStatus(id, STATUSES[k - 1].id); break; }
     case 'status': await setStatus(id, b.dataset.v); break;
     case 'open3d':
-      // mevcut tasarım siparişteki hâlden farklıysa (aynı sipariş açıkken yapılmış değişiklikler dahil) onay iste
-      if (cfg.modules.length && JSON.stringify(cfg) !== JSON.stringify(o.cfg) && !confirm(ui.linked === id ? 'Bu siparişte kaydedilmemiş değişiklikler var; sipariş yeniden yüklenirse kaybolur. Devam edilsin mi?' : 'Konfigüratördeki mevcut tasarım bu siparişle değiştirilecek (kaydedilmemiş değişiklikler kaybolur). Devam edilsin mi?')) break;
+      // mevcut tasarım siparişteki hâlden farklıysa (aynı sipariş açıkken yapılmış değişiklikler dahil) onay iste · siparişin normalize edilmiş hâliyle karşılaştırılır (eski kayıtlarda gereksiz soru çıkmasın)
+      if (cfg.modules.length && JSON.stringify(cfg) !== JSON.stringify((() => { const n = clone(o.cfg); migrateTypes(n); normalize(n); return n; })()) && !confirm(ui.linked === id ? 'Bu siparişte kaydedilmemiş değişiklikler var; sipariş yeniden yüklenirse kaybolur. Devam edilsin mi?' : 'Konfigüratördeki mevcut tasarım bu siparişle değiştirilecek (kaydedilmemiş değişiklikler kaybolur). Devam edilsin mi?')) break;
       cfg = clone(o.cfg); ui.sel = cfg.modules[0]?.uid; ui.linked = id; setTab('config'); refresh(); camPersp(); toast(`${o.no} konfigüratöre yüklendi`); break;
     case 'cut': openCutList(o.cfg, `${o.no} · ${o.customer?.name || ''}`); break;
     case 'del':
@@ -4240,7 +4306,7 @@ async function exportCutXlsx(c, title){
   const body = (r, n, opts = {}) => { for (let i = 1; i <= n; i++){ const cell = r.getCell(i); cell.font = Object.assign({name: FONT, size: 10}, opts.font || {}); cell.border = box; cell.alignment = {vertical: 'top', wrapText: i === n}; } };
   const sub = `${today()} · ${c.modules.length} modül · ölçüler mm · boy = su yönü (kaplamada)`;
   const modLabel = mod => { const i = +(String(mod).match(/^M(\d+)$/) || [])[1] - 1, m = c.modules[i]; if (!m) return mod;
-    const d = moduleDims(m, c), D = isTall(m) || isUpper(m) ? modD(m) : c.depth; return `${mod} · ${TYPES[m.type].label} · ${layoutOf(m).name} · ${m.width/10} × ${+(d.H/10).toFixed(1)} × ${+(D/10).toFixed(1)} cm`; };
+    const d = moduleDims(m, c), D = isTall(m) || isUpper(m) ? modD(m) : c.depth; return `${mod} · ${TYPES[m.type].label} · ${layoutOf(m).name}${upperGlass(m) ? (aluGlass(m) ? " (alüminyum çerçeve, füme cam)" : " (ahşap çerçeve)") : isUpper(m) && m.mirrorDoor ? " (aynalı kapak)" : ""} · ${m.width/10} × ${+(dispH(m, c)/10).toFixed(1)} × ${+(D/10).toFixed(1)} cm`; };
   const m2f = (r, qc, lc, wc) => ({formula: `${qc}${r}*${lc}${r}*${wc}${r}/1000000`});
   const matKey = r => r.mat.includes(`${r.t} mm`) ? r.mat : `${r.mat} · ${r.t} mm`; // malzeme adı kalınlığı zaten içeriyorsa tekrar yazma
 
@@ -4264,7 +4330,7 @@ async function exportCutXlsx(c, title){
     ws.addRow([]); header(ws, ['Malzeme (plaka)', 'Alan m²', 'Parça adedi']);
     const area = {}; cl.rows.forEach(r => { const k = matKey(r); (area[k] = area[k] || {a: 0, n: 0}).a += r.qty*r.L*r.W/1e6; area[k].n += r.qty; });
     Object.entries(area).sort((a, b) => b[1].a - a[1].a).forEach(([k, v]) => { const r = ws.addRow([k, Math.round(v.a*1000)/1000, v.n]); r.getCell(2).numFmt = '0.00'; body(r, 3); });
-    ws.addRow([]); const n = ws.addRow(['Fiyatlar örnektir; gerçek fiyat listesiyle teyit edilmelidir.']); n.getCell(1).font = {name: FONT, size: 9, italic: true, color: {argb: 'FF666666'}}; }
+    ws.addRow([]); const n = ws.addRow(['Tezgah, porselen eviye ve gider, ayna, cam ve lake boyası fiyatları henüz örnek; çubuk kulp fiyatı geçici; 0 € görünen kalemlerin fiyatı sonra girilecek.']); n.getCell(1).font = {name: FONT, size: 9, italic: true, color: {argb: 'FF666666'}}; }
 
   // ---- 2. PARÇA LİSTESİ (modüle göre, kategori sırasıyla) ----
   { const N = 13, ws = sheet('Parça listesi', [5, 16, 40, 6, 9, 9, 8, 34, 7, 7, 9, 40, 1], 4); titleRows(ws, N - 1, sub);
@@ -4277,7 +4343,7 @@ async function exportCutXlsx(c, title){
         const row = ws.addRow([++no, cutCat(r.part), r.part, r.qty, r.L, r.W, r.t, r.mat, r.band ? r.band[0] : 0, r.band ? r.band[1] : 0, null, r.note || '']);
         row.getCell(11).value = Object.assign(m2f(row.number, 'D', 'E', 'F'), {result: Math.round(r.qty*r.L*r.W/1e3)/1e3}); row.getCell(11).numFmt = '0.000'; body(row, N - 1); }); });
     if (cl.tops.length){ group(ws, 'Porselen tezgah', N - 1);
-      cl.tops.forEach(t => { const row = ws.addRow([++no, 'Tezgah', t.part, 1, t.L, t.W, t.t, t.mat, 0, 0, null, '']);
+      cl.tops.forEach(t => { const row = ws.addRow([++no, 'Tezgah', t.part, t.qty || 1, t.L, t.W, t.t, t.mat, 0, 0, null, '']);
         row.getCell(11).value = Object.assign(m2f(row.number, 'D', 'E', 'F'), {result: Math.round(t.L*t.W/1e3)/1e3}); row.getCell(11).numFmt = '0.000'; body(row, N - 1); }); } }
 
   // ---- 3. KESİM LİSTESİ (malzeme + kalınlığa göre) ----
@@ -4321,14 +4387,14 @@ function openCutList(c, title){
   const bandTxt = b => b && (b[0] || b[1]) ? [b[0] ? b[0] + '×boy' : '', b[1] ? b[1] + '×en' : ''].filter(Boolean).join(' + ') : '—';
   const dec = v => String(v).replace('.', ','); // ondalık virgül (283,5)
   const csv = ['Parça;Modül;Adet;Boy;En;Kalınlık;Malzeme;Kenar bandı;Not'].concat(cl.rows.map(r => [r.part, r.mod, r.qty, dec(r.L), dec(r.W), dec(r.t), r.mat, bandTxt(r.band), r.note].join(';')))
-    .concat(cl.tops.map(t => [t.part, '-', 1, t.L, t.W, t.t, t.mat, '', ''].join(';'))).join('\n');
-  const area = {}; cl.rows.forEach(r => { area[r.mat + ' (' + r.t + ' mm)'] = (area[r.mat + ' (' + r.t + ' mm)'] || 0) + r.qty*r.L*r.W/1e6; });
+    .concat(cl.tops.map(t => [t.part, '-', t.qty || 1, t.L, t.W, t.t, t.mat, '', ''].join(';'))).join('\n');
+  const area = {}; cl.rows.forEach(r => { const k = r.mat.includes(`${r.t} mm`) ? r.mat : `${r.mat} · ${r.t} mm`; area[k] = (area[k] || 0) + r.qty*r.L*r.W/1e6; }); // kalınlık adda varsa tekrar yazılmaz (Excel matKey ile aynı)
   openDialog(`
     <div class="row sp"><h3>Parça listesi · ${esc(title)}</h3><div class="row"><button class="btn sm primary" data-oact="xlsx">Excel indir</button><button class="btn sm" data-oact="copy-csv">CSV kopyala</button><button class="btn sm" data-close>Kapat</button></div></div>
     <textarea id="csv-src" hidden rows="4">${esc(csv)}</textarea>
     <div class="tbl-wrap"><table><thead><tr><th>Parça</th><th>Modül</th><th>Adet</th><th>Boy</th><th>En</th><th>Kal.</th><th>Malzeme</th><th>Bant</th><th>Not</th></tr></thead><tbody>
     ${cl.rows.map(r => `<tr><td>${esc(r.part)}</td><td class="mono">${r.mod}</td><td class="n">${r.qty}</td><td class="n">${dec(r.L)}</td><td class="n">${dec(r.W)}</td><td class="n">${dec(r.t)}</td><td>${esc(r.mat)}</td><td class="mono">${bandTxt(r.band)}</td><td class="muted">${esc(r.note)}</td></tr>`).join('')}
-    ${cl.tops.map((t, i) => `<tr><td>${esc(t.part)}</td><td class="mono">—</td><td class="n">1</td><td class="n">${t.L}</td><td class="n">${t.W}</td><td class="n">${t.t}</td><td>${esc(t.mat)}</td><td class="mono">—</td><td class="muted">${i === 0 && cl.sinksOut.filter(s => s.s.type === 'integrated').length ? 'Entegre hazne işlemesi' : ''}</td></tr>`).join('')}
+    ${cl.tops.map((t, i) => `<tr><td>${esc(t.part)}</td><td class="mono">—</td><td class="n">${t.qty || 1}</td><td class="n">${t.L}</td><td class="n">${t.W}</td><td class="n">${t.t}</td><td>${esc(t.mat)}</td><td class="mono">—</td><td class="muted">${i === 0 && cl.sinksOut.filter(s => s.s.type === 'integrated').length ? 'Entegre hazne işlemesi' : ''}</td></tr>`).join('')}
     </tbody></table></div>
     <div class="grid2">
       <div><h2 class="sec">Malzeme alanı</h2><div class="tbl-wrap"><table><tbody>${Object.entries(area).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${v.toFixed(2)} m²</td></tr>`).join('')}</tbody></table></div>
@@ -4357,7 +4423,7 @@ function renderProd(){
     ${os.length ? '' : `<div class="empty"><b>Pano boş</b><span>Konfigüratörden oluşturulan siparişler burada aşama sütunlarına dizilir. Kartlardaki oklarla aşama değiştirilir.</span></div>`}
     <div class="kanban">${cols.map(s => { const items = os.filter(o => o.status === s.id).sort((a, b) => (a.due || '9').localeCompare(b.due || '9'));
       return `<div class="col"><h4>${s.label}<span class="mono muted">${items.length}</span></h4>
-      ${items.map(o => `<div class="kc"><div class="t"><b>${esc(o.customer?.name || 'İsimsiz')}</b><span class="mono muted">${esc(o.no.slice(-3))}</span></div>
+      ${items.map(o => `<div class="kc"><div class="t"><b>${esc(o.customer?.name || 'İsimsiz')}</b><span class="mono muted">${esc(String(o.no || '').slice(-3))}</span></div>
         <span class="muted">${esc(o.summary || '')}</span>
         <span class="${isLate(o) ? 'late' : 'muted'}">Termin ${fmtDate(o.due)}</span>
         <div class="acts"><button class="btn sm" data-oact="back" data-id="${esc(o.id)}" ${stIdx(o.status) === 0 ? 'disabled' : ''} aria-label="Önceki aşama">←</button>
