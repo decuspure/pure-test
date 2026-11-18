@@ -401,8 +401,9 @@ const UPPER_XMAX = 5000; // üst modül yatay konumu (orta çizgi) ± bu kadar m
 const UPPER_FRAME = 50; // camlı kapak çerçevesi (kullanıcı 2026-10-20: 5 cm); cam arkadan 8 mm lambaya oturur, 4 mm şeffaf temperli
 const ALU_FRAME = 20; // ALÜMİNYUM ÇERÇEVELİ CAM KAPAK (kullanıcı 2026-11-10): camlı üst modülde Malzeme > Kapak tipi'nden modüle özel seçilir (m.glassFrame 'alu'); mat siyah alüminyum profil 20 mm, 4 mm füme cam
 const ALU_BACK = 45, ALU_FRONT_D = 8; // alüminyum profilin ARKA kanadı 45 mm (menteşe kabı Ø35, kenardan 22,5 mm oturur; kullanıcı 2026-11-10 "iç kısımda çerçeve daha kalın, menteşeyi kurtaracak"), öndeki 20 mm kademe 8 mm derin
-const aluGlass = m => upperGlass(m) && m.glassFrame === 'alu';
-const glassFrameW = m => aluGlass(m) ? ALU_FRAME : UPPER_FRAME; // görünen çerçeve eni
+const aluGlass = m => upperGlass(m) && (m.glassFrame === 'alu' || m.glassFrame === 'cam'); // alüminyum profilli cam kapak (çerçeveli ya da çerçevesiz görünüm)
+const glassFlush = m => upperGlass(m) && m.glassFrame === 'cam'; // ÇERÇEVESİZ GÖRÜNÜM (kullanıcı 2026-11-18): cam kapağın tamamını önden örter (dıştan yapıştırma), arkasında alüminyum taşıyıcı çerçeve (ALU_BACK menteşe kanadı); önden yalnız cam görünür
+const glassFrameW = m => glassFlush(m) ? 0 : aluGlass(m) ? ALU_FRAME : UPPER_FRAME; // görünen çerçeve eni
 const upperGlass = m => isUpper(m) && !!layoutOf(m).glass;
 const frontLocked = m => !!m && (tallElcik(m) || upperGlass(m)); // kapağı HER ZAMAN DÜZ modüller: elcikli boy dolap, camlı üst modül (kullanıcı 2026-11-02 "çıtalı direkt seçilmesin camlıda")
 const TALL_SPLIT = .5; // iki kapak eşit yükseklikte (kapak arası boşluk gövde ortasında)
@@ -701,10 +702,9 @@ const ORG_SETS = [[350, ['o2z', 'o2x']], [550, ['o2z', 'o2x', 'o4', 'o3l']], [70
 const orgOpts = W => ORG_SETS.find(([mx]) => W <= mx)[1];
 /* organizer parçaları (3B drawerBox ile aynı ölçüler): iw çekmece iç eni (yanlar arası), d kutu derinliği, hb yan yüksekliği, T gövde plakası, u eviye U kesimli mi, tk organizer plakası.
    [ad, adet, uzunluk, en] — taban rw × rd, çerçeve oh yüksekliğinde, bölmeler çerçeve içinde (aynı boydakiler tek satır); fiyat gövde malzemesinin ince plakasının m² fiyatıyla */
-/* ORGANİZER HER ZAMAN 9 mm DOĞAL AHŞAP KAPLAMA (kullanıcı 2026-11-02; önce 19 dendi, sonra "9 olsun, 19 u yanlış söyledim"; eskiden gövdenin ince plakası 8 / 9 mm): rengi kapak kaplamaysa kapağınki,
-   değilse gövde kaplamaysa gövdeninki, ikisi de değilse DCS-MK-V (vernikli) */
-const ORG_T = 9;
-const orgColor = (c = cfg) => c.front.mat === 'kaplama' ? c.front.color : c.body.mat === 'kaplama' ? c.body.color : 'vernikli';
+// ORGANİZER KAPAKLA AYNI MALZEME VE RENKTE (kullanıcı 2026-11-18; eskiden 2026-11-02'den beri hep 9 mm ahşap kaplama): kapak kaplamaysa 9 mm kaplama, lakeyse 8 mm lake, kapağın renginde
+const orgT = (c = cfg) => c.front.mat === 'kaplama' ? 9 : 8;
+const orgName = (c = cfg) => `${c.front.mat === 'kaplama' ? 'Kaplama' : 'MDF Lake'} ${orgT(c)} mm · ${colorName(c.front.mat, c.front.color)}${c.front.mat === 'lake' ? ' · ' + LAKE_FIN[c.front.fin].label : ''}`;
 function orgParts(o, iw, d, hb, T, u, tk){
   // bölme yüksekliği: tepsi (taban T + organizer tabanı tk) üstünde, çekmece yanının üstünden 5,5 mm aşağıda biter (9 mm kaplamada M çekmecede 57–58, C çekmecede 58 mm)
   const O = ORGS[o], oh = Math.min(58, hb - T - tk - 5.5), rw = iw - 12, rd = d - 16 - T - (u ? Math.min(d - 60, U_D) + 2 : 0);
@@ -1071,7 +1071,7 @@ function normalize(c = cfg){
       if (tallElcik(m)){ const dd = moduleDims(m, c), [lo, hi] = elcikRange(dd.bottomY + 1.5, dd.topY - 1.5); m.elcikY = clamp(Math.round((m.elcikY != null ? +m.elcikY : ELCIK.y0)/10)*10, lo, Math.max(lo, hi)); } // elcik açıklığının altı yerden (ilk 88 cm), kapağın içinde
     }
     if (isUpper(m)){ // ÜST MODÜL (U1 / U2): ölçüler tipin sınırında, kulp modüle özel (gola gövde altında / push-open / çubuk kulp), aynalı kapak isteğe bağlı; yan kapama modül boyunda (yere kadar yok)
-      const Tu = TYPES[m.type]; m.hidden = false; delete m.idr; delete m.gapL; if (upperGlass(m)) m.glassFrame = m.glassFrame === 'alu' ? 'alu' : 'ahsap'; else delete m.glassFrame; // camlı kapak çerçevesi: ahşap (5 cm) / alüminyum (20 mm)
+      const Tu = TYPES[m.type]; m.hidden = false; delete m.idr; delete m.gapL; if (upperGlass(m)) m.glassFrame = ['alu', 'cam'].includes(m.glassFrame) ? m.glassFrame : 'ahsap'; else delete m.glassFrame; // camlı kapak çerçevesi: ahşap (5 cm) / alüminyum (20 mm)
       m.width = clamp(Math.round((+m.width || Tu.W)/Tu.Wstep)*Tu.Wstep, Tu.Wmin, Tu.Wmax);
       m.height = clamp(Math.round((+m.height || Tu.H)/Tu.Hstep)*Tu.Hstep, Tu.Hmin, Tu.Hmax);
       if (!HANDLES[m.handle]) m.handle = c.handle; if (!HANDLE_COLORS[m.handleColor]) m.handleColor = c.handleColor; if (!KANAL_FIN[m.kanalFin]) m.kanalFin = c.kanalFin;
@@ -1301,7 +1301,7 @@ function cutList(c = cfg){
       push('Arkalık', mod, 1, W - 2*T + 10, ch - T, backT(c.body.mat), bBack, b9, `Yan dikmelerde kanala, ön yüzü arka kenardan ${TALL_BACK_IN} mm içeride · alt tablanın üstünden en üste kadar, yukarıdan sürülür`);
       const st = (m.mirrorDoor ? ' · Aynalı kapak (önde 4 mm ayna)' : c.front.style !== 'duz' ? ' · ' + frontStyleText(c.front) : '') + (fGrain('dikey') ? ' · ' + fGrain('dikey') : '');
       if (aluGlass(m)) (pair ? ['sol', 'sağ'] : [side]).forEach(k => // ALÜMİNYUM ÇERÇEVELİ CAM KAPAK: hazır kapak (ahşap parça yok), fiyat sonra girilecek
-        hw.push({item:`Alüminyum çerçeveli cam kapak (${pair ? k : 'tek'}, menteşe ${k}) · mat siyah alüminyum profil: önde ${ALU_FRAME} mm, arkada ${ALU_BACK} mm menteşe kanadı · 4 mm füme temperli cam · ${String(DW).replace(".", ",")} × ${String(dH).replace(".", ",")} mm · alüminyum çerçeveye uygun menteşe kabı teyit edilecek`, mod, qty:1, price: PRICE.aluDoor}));
+        hw.push({item: glassFlush(m) ? `Çerçevesiz görünümlü cam kapak (${pair ? k : 'tek'}, menteşe ${k}) · 4 mm füme temperli cam, kenarları rodajlı, kapağın tamamını önden örter (alüminyuma dıştan yapıştırma) · arkada mat siyah alüminyum taşıyıcı çerçeve ${ALU_BACK} mm (menteşe kanadı) · ${String(DW).replace(".", ",")} × ${String(dH).replace(".", ",")} mm · alüminyum çerçeveye uygun menteşe kabı teyit edilecek` : `Alüminyum çerçeveli cam kapak (${pair ? k : 'tek'}, menteşe ${k}) · mat siyah alüminyum profil: önde ${ALU_FRAME} mm, arkada ${ALU_BACK} mm menteşe kanadı · 4 mm füme temperli cam · ${String(DW).replace(".", ",")} × ${String(dH).replace(".", ",")} mm · alüminyum çerçeveye uygun menteşe kabı teyit edilecek`, mod, qty:1, price: PRICE.aluDoor}));
       else if (upperGlass(m)){ // CAMLI KAPAK: TEK PARÇA çerçeve (kullanıcı 2026-10-20) — kapak plakasının ortası CNC ile boşaltılır, 5 cm çerçeve kalır; cam arkadan 8 mm lambada
         const F = UPPER_FRAME, gw = DW - 2*F + 16, gh = dH - 2*F + 16;
         (pair ? ['sol', 'sağ'] : [side]).forEach(k => { const lab = `Kapak (${pair ? k : 'tek'}) · camlı`;
@@ -1437,8 +1437,8 @@ function cutList(c = cfg){
       if (c.handle === 'kulp') hw.push({item:`Çubuk kulp ${Math.round(Math.min(W*.5, 320))} mm · ${HANDLE_COLORS[c.handleColor].label}`, mod, qty:1, price:PRICE.pull});
       if (u) hw.push({item:'U kesim işçiliği + sifon kanalı', mod, qty:1, price:PRICE.ucut});
       const o = m.org[k];
-      // organizer: parçaları parça listesinde, HER ZAMAN 9 mm ahşap kaplamadan (ORG_T, orgColor; kullanıcı 2026-11-02); fiyat kaplama 9 m² fiyatıyla
-      if (o && o !== 'yok' && ORGS[o]) orgParts(o, W - 2*T - 26 - 2*LGB.side, cd - .5 - 40, lg[1], T, u, ORG_T).forEach(([nm, q, L, Wd]) => push(`Organizer ${k+1} · ${ORGS[o].label} · ${nm}`, mod, q, L, Wd, ORG_T, `Kaplama ${ORG_T} mm · ${colorName('kaplama', orgColor(c))}`, 'kaplama' + ORG_T, 'Ahşap kaplama (organizer her zaman kaplama)'));
+      // organizer: parçaları parça listesinde, KAPAK MALZEMESİNDEN ve RENGİNDE (orgT, orgName; kullanıcı 2026-11-18); fiyat kaplama 9 ya da lake 8 mm m² fiyatıyla
+      if (o && o !== 'yok' && ORGS[o]) orgParts(o, W - 2*T - 26 - 2*LGB.side, cd - .5 - 40, lg[1], T, u, orgT(c)).forEach(([nm, q, L, Wd]) => push(`Organizer ${k+1} · ${ORGS[o].label} · ${nm}`, mod, q, L, Wd, orgT(c), orgName(c), c.front.mat + '9', 'Kapak malzemesinde ve renginde'));
     });
     const inner = m.hidden && fit[0] && fit[0].inner; // 3B'de sığmıyorsa gizli çekmece yok
     if (inner){
@@ -2626,9 +2626,14 @@ function buildUpper(m, x0){
         const geo = new THREE.ExtrudeGeometry(sh, {depth: z1 - z0, bevelEnabled: false}); geo.translate(0, 0, z0);
         const fr = new THREE.Mesh(geo, am); fr.castShadow = fr.receiveShadow = true; dg.add(fr);
         if (ui.edges){ const ol = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), M.edge); ol.raycast = () => {}; dg.add(ol); } };
-      ring(F, -ALU_FRONT_D, 0); ring(ALU_BACK, -fT, -ALU_FRONT_D);
+      const flush = glassFlush(m); // çerçevesiz görünüm: cam önde, kapak ölçüsünde; alüminyum taşıyıcı yalnız arkada
+      if (flush) ring(ALU_BACK, -fT, -4); else { ring(F, -ALU_FRONT_D, 0); ring(ALU_BACK, -fT, -ALU_FRONT_D); }
       const gm = M.glassFume || (M.glassFume = new THREE.MeshStandardMaterial({color: srgb('#2b2d30'), metalness: .1, roughness: .05, transparent: true, opacity: .62, envMapIntensity: 1.2, depthWrite: false}));
-      const gl = box(dw - 2*F + 16, y1 - y0 - 2*F + 16, 4, gm, sgn*dw/2, yc, -ALU_FRONT_D/2, dg); gl.castShadow = false; gl.renderOrder = 3;
+      const gl = flush ? (() => { // çerçevesiz cam: kenarları RODAJLI (kullanıcı 2026-11-18) — 3B'de 1 mm yumuşak pah
+        const b = 1, sh = new THREE.Shape(), xa = Math.min(0, sgn*dw) + b, xb = Math.max(0, sgn*dw) - b;
+        sh.moveTo(xa, y0 + b); sh.lineTo(xb, y0 + b); sh.lineTo(xb, y1 - b); sh.lineTo(xa, y1 - b); sh.lineTo(xa, y0 + b);
+        const geo = new THREE.ExtrudeGeometry(sh, {depth: 4 - 2*b, bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 2}); geo.translate(0, 0, -4 + b);
+        const ms = new THREE.Mesh(geo, gm); dg.add(ms); return ms; })() : box(dw - 2*F + 16, y1 - y0 - 2*F + 16, 4, gm, sgn*dw/2, yc, -ALU_FRONT_D/2, dg); gl.castShadow = false; gl.renderOrder = 3;
     } else if (glass){ // camlı kapak: TEK PARÇA 5 cm çerçeve (kapak plakası, ortası boşaltılmış; birleşim çizgisi yok) + arkadan lambaya oturan 4 mm cam
       const xa = Math.min(0, sgn*dw), xb = Math.max(0, sgn*dw), sh = new THREE.Shape(), ho = new THREE.Path();
       sh.moveTo(xa, y0); sh.lineTo(xb, y0); sh.lineTo(xb, y1); sh.lineTo(xa, y1); sh.lineTo(xa, y0);
@@ -2756,8 +2761,8 @@ function drawerBox(dg, b){
     orgZ0 = zc + t + 2;
   }
   if (b.org && b.org !== 'yok'){
-    // organizer HER ZAMAN 9 mm ahşap kaplama (ORG_T, orgColor; kullanıcı 2026-11-02) — parça listesiyle aynı (orgParts)
-    const o = ORGS[b.org], tk = ORG_T, oh = Math.min(58, hb - BT - tk - 5.5), y = yb + BT + tk + oh/2, wallM = panelMat('kaplama', orgColor(cfg)); // bölmeler tepsi tabanının üstünde
+    // organizer KAPAKLA AYNI malzeme ve renk (orgT; kullanıcı 2026-11-18) — parça listesiyle aynı (orgParts)
+    const o = ORGS[b.org], tk = orgT(cfg), oh = Math.min(58, hb - BT - tk - 5.5), y = yb + BT + tk + oh/2, wallM = panelMat(cfg.front.mat, cfg.front.color, cfg.front.fin); // bölmeler tepsi tabanının üstünde
     const rx0 = ix0 + 6, rx1 = ix1 - 6, rz0 = orgZ0, rz1 = z1 - 16, rw = rx1 - rx0, rd = rz1 - rz0;
     if (!o || !o.lines || rw < 80 || rd < 80) return;
     box(rw, tk, rd, wallM, (rx0 + rx1)/2, yb + BT + tk/2, (rz0 + rz1)/2, dg);
@@ -3317,7 +3322,8 @@ function frontIcon(k){
     oval: '<rect x="9" y="8" width="22" height="12" rx="1" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round"/>',
     kose: '<rect x="9" y="8" width="22" height="12" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="miter"/>',
     serit: [7, 12, 17, 22, 27, 32].map(x => `<line x1="${x}" x2="${x}" y1="4" y2="24" stroke="var(--accent)" stroke-width="2"/>`).join(''),
-    alu: '<rect x="4.5" y="4.5" width="31" height="19" fill="#4a4d52" fill-opacity=".55" stroke="#151515" stroke-width="3"/>' // alüminyum çerçeve + füme cam
+    alu: '<rect x="4.5" y="4.5" width="31" height="19" fill="#4a4d52" fill-opacity=".55" stroke="#151515" stroke-width="3"/>',
+    cam: '<rect x="3" y="3" width="34" height="22" fill="#4a4d52" fill-opacity=".55" stroke="#4a4d52" stroke-width=".6"/><rect x="6" y="6" width="28" height="16" fill="none" stroke="#151515" stroke-opacity=".45" stroke-width="1"/>' // çerçevesiz cam: önde tam cam, arkada alüminyum (soluk) // alüminyum çerçeve + füme cam
   };
   return `<svg viewBox="0 0 40 28" aria-hidden="true">${fr}${P[k]}</svg>`;
 }
@@ -3372,8 +3378,8 @@ function renderLeft(){
       ${(() => { // kapağı hep düz modül (elcikli boy dolap, camlı üst modül) seçiliyken kapak tipi pasif: yalnız düz (frontLocked)
         const selE = (c.modules.find(x => x.uid === ui.sel) || null), lockE = frontLocked(selE), lockN = lockE ? (upperGlass(selE) ? 'Camlı üst modülde' : 'Elcikli boy dolapta') : '';
         const locked = [c.modules.some(tallElcik) && 'elcikli boy dolapta', c.modules.some(upperGlass) && 'camlı üst modülde'].filter(Boolean);
-        if (selE && upperGlass(selE)) return `<div class="ftypes">${[['ahsap', 'duz', `Ahşap çerçeve`], ['alu', 'alu', `Alüminyum çerçeve`]].map(([v, ic, n]) => `<button data-act="mset" data-k="glassFrame" data-v="${v}" aria-pressed="${(selE.glassFrame || 'ahsap') === v}">${frontIcon(ic)}<span>${n}</span></button>`).join('')}</div>`
-          + `<p class="hint" style="margin:6px 0 0">Camlı üst modülde kapak: ahşap çerçeve (${UPPER_FRAME/10} cm, kapak malzemesi, şeffaf cam) ya da alüminyum çerçeve (önde ${ALU_FRAME} mm mat siyah, arkada ${ALU_BACK} mm menteşe kanadı, füme cam); çıta olmaz. Diğer modüllerin kapak tipini değiştirmek için başka bir modül seçin ya da seçimi kaldırın.</p>`; // camlı üst modülün çerçevesi modüle özel (kullanıcı 2026-11-10)
+        if (selE && upperGlass(selE)) return `<div class="ftypes">${[['ahsap', 'duz', `Ahşap çerçeve`], ['alu', 'alu', `Alüminyum çerçeve`], ['cam', 'cam', `Çerçevesiz cam`]].map(([v, ic, n]) => `<button data-act="mset" data-k="glassFrame" data-v="${v}" aria-pressed="${(selE.glassFrame || 'ahsap') === v}">${frontIcon(ic)}<span>${n}</span></button>`).join('')}</div>`
+          + `<p class="hint" style="margin:6px 0 0">Camlı üst modülde kapak: ahşap çerçeve (${UPPER_FRAME/10} cm, kapak malzemesi, şeffaf cam) , alüminyum çerçeve (önde ${ALU_FRAME} mm mat siyah, arkada ${ALU_BACK} mm menteşe kanadı, füme cam) ya da çerçevesiz cam (rodajlı kenarlı füme cam kapağın tamamını önden örter, alüminyum taşıyıcı arkada kalır); çıta olmaz. Diğer modüllerin kapak tipini değiştirmek için başka bir modül seçin ya da seçimi kaldırın.</p>`; // camlı üst modülün çerçevesi modüle özel (kullanıcı 2026-11-10)
         return `<div class="ftypes">${Object.entries(FRONT_STYLES).filter(([k]) => !lockE || k === 'duz').map(([k, v]) => `<button data-act="set" data-k="front.style" data-v="${k}" aria-pressed="${lockE ? k === 'duz' : c.front.style === k}" title="${v}"${lockE ? ' disabled style="opacity:1;cursor:default"' : ''}>${frontIcon(k)}<span>${v}</span></button>`).join('')}</div>`
           + (selE && isUpper(selE) && selE.mirrorDoor ? `<p class="hint" style="margin:6px 0 0">M${c.modules.indexOf(selE) + 1} aynalı kapaklı: ön yüz ayna, kapak tipi (çıta) bu modüle uygulanmaz.</p>` : '') // tam tarama 2026-11-10
           + (lockE ? `<p class="hint" style="margin:6px 0 0">${lockN} yalnız düz kapak (çıta olmaz). Diğer modüllerin kapak tipini değiştirmek için başka bir modül seçin ya da seçimi kaldırın.</p>`
@@ -3517,7 +3523,7 @@ function renderRight(){
     else if (isUpper(m)){ // üst modül: ölçü, konum (yatay / yerden), menteşe (U1), aynalı kapak
       const {H, bottomY} = moduleDims(m), Tu = TYPES[m.type];
       body = `<div class="row sp"><h3 class="ttl">M${i+1} · ${Tu.label}</h3><span class="tag">${m.width/10}×${H/10}×${Tu.D/10}</span></div>
-      <p class="hint" style="margin:-8px 0 0">${Tu.pair ? 'İki kapak (sol soldan, sağ sağdan menteşeli)' : 'Tek kapak'}${aluGlass(m) ? ', alüminyum çerçeveli camlı' : upperGlass(m) ? ', camlı' : ''} · ${upperShelves(m).length} ayarlı raf · ${m.handle === 'kanal' ? 'Gola (gövde altında)' : HANDLES[m.handle]}</p>
+      <p class="hint" style="margin:-8px 0 0">${Tu.pair ? 'İki kapak (sol soldan, sağ sağdan menteşeli)' : 'Tek kapak'}${glassFlush(m) ? ', çerçevesiz camlı' : aluGlass(m) ? ', alüminyum çerçeveli camlı' : upperGlass(m) ? ', camlı' : ''} · ${upperShelves(m).length} ayarlı raf · ${m.handle === 'kanal' ? 'Gola (gövde altında)' : HANDLES[m.handle]}</p>
       <div>
       <div class="field"><label for="m-type">Modül</label><select id="m-type" data-m="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${m.type === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select></div>
       ${wField('m-width', 'm', m.width, Tu.Wmin, Tu.Wmax, Tu.Wstep)}<p class="hint" style="margin:-6px 0 10px">Derinlik sabit ${Tu.D/10} cm</p>
@@ -3526,7 +3532,7 @@ function renderRight(){
       <div class="seg"><button data-act="hinge" data-v="L" aria-pressed="${m.hinge === 'L'}">Soldan</button><button data-act="hinge" data-v="R" aria-pressed="${m.hinge !== 'L'}">Sağdan</button></div>`}
       <div class="lbl" style="margin:10px 0 6px">Kapak</div>
       <div class="seg">${LAYOUTS[m.type].map(l => `<button data-act="mset" data-k="layout" data-v="${l.id}" aria-pressed="${m.layout === l.id}">${l.glass ? 'Camlı' : 'Düz'}</button>`).join('')}</div>
-      ${upperGlass(m) ? `<p class="hint" style="margin:6px 0 0">${aluGlass(m) ? `Alüminyum çerçeve: mat siyah, önde ${ALU_FRAME} mm, arkada ${ALU_BACK} mm menteşe kanadı; 4 mm füme temperli cam` : `${UPPER_FRAME/10} cm çerçeve (kapak malzemesi), 4 mm şeffaf temperli cam`}; çerçeve Malzeme sekmesinde Kapak tipi’nden seçilir, çıta ve ayna olmaz.</p>`
+      ${upperGlass(m) ? `<p class="hint" style="margin:6px 0 0">${glassFlush(m) ? `Çerçevesiz cam: 4 mm füme temperli cam, kenarları rodajlı, kapağın tamamını önden örter; arkada ${ALU_BACK} mm mat siyah alüminyum taşıyıcı çerçeve` : aluGlass(m) ? `Alüminyum çerçeve: mat siyah, önde ${ALU_FRAME} mm, arkada ${ALU_BACK} mm menteşe kanadı; 4 mm füme temperli cam` : `${UPPER_FRAME/10} cm çerçeve (kapak malzemesi), 4 mm şeffaf temperli cam`}; çerçeve Malzeme sekmesinde Kapak tipi’nden seçilir, çıta ve ayna olmaz.</p>`
         : `<label class="check" style="margin-top:10px"><input type="checkbox" id="m-mirror" data-m="mirrorDoor" ${m.mirrorDoor ? 'checked' : ''}>Aynalı kapak</label>`}
       <div class="field" style="margin-top:10px"><label for="m-x">Yatay konum (orta çizgi) <output>${m.x} mm</output></label><input type="range" id="m-x" min="${-UPPER_XMAX}" max="${UPPER_XMAX}" step="10" value="${m.x}" data-m="x"></div>
       <div class="field"><label for="m-bottom">Alt kenar yerden <output>${bottomY} mm</output></label><input type="range" id="m-bottom" min="0" max="${2400 - m.height}" step="10" value="${bottomY}" data-m="bottom"></div>
@@ -4223,7 +4229,7 @@ function renderOrders(){
     <div class="tbl-wrap"><table><thead><tr><th>Modül</th><th>Tip</th><th>Dizilim</th><th>G × Y × D (cm)</th><th>Özellik</th></tr></thead><tbody>
       ${oc.modules.map((m, i) => { const mx = moduleX(oc), s = sinkOver(m, oc), dm = moduleDims(m, oc);
         return `<tr><td class="mono">M${i+1}</td><td>${TYPES[m.type].label}</td><td>${(LAYOUTS[m.type].find(l => l.id === m.layout) || {}).name || ''}</td><td class="mono">${m.width/10} × ${Math.round(dispH(m, oc)/10)} × ${(isTall(m) || isUpper(m) ? modD(m) : oc.depth)/10}</td>
-        <td>${[upperGlass(m) ? (aluGlass(m) ? 'Camlı kapak · alüminyum çerçeve (mat siyah), füme cam' : `Camlı kapak · ahşap çerçeve ${UPPER_FRAME/10} cm`) : isUpper(m) && m.mirrorDoor ? 'Aynalı kapak' : '', m.hidden ? 'Gizli Çekmece' : '', tallIdr(m).length ? 'İç çekmece: ' + tallIdr(m).join(' · ') : '', s ? 'U kesim (lavabo)' : '', Object.entries(m.org || {}).filter(([k, x]) => +k < drawerHeights(m, oc).length && x && x !== 'yok' && ORGS[x]).map(([, x]) => ORGS[x].label).join(', ')].filter(Boolean).join(' · ') || '—'}</td></tr>`; }).join('')}
+        <td>${[upperGlass(m) ? (glassFlush(m) ? 'Camlı kapak · çerçevesiz (rodajlı füme cam önde, alüminyum taşıyıcı arkada)' : aluGlass(m) ? 'Camlı kapak · alüminyum çerçeve (mat siyah), füme cam' : `Camlı kapak · ahşap çerçeve ${UPPER_FRAME/10} cm`) : isUpper(m) && m.mirrorDoor ? 'Aynalı kapak' : '', m.hidden ? 'Gizli Çekmece' : '', tallIdr(m).length ? 'İç çekmece: ' + tallIdr(m).join(' · ') : '', s ? 'U kesim (lavabo)' : '', Object.entries(m.org || {}).filter(([k, x]) => +k < drawerHeights(m, oc).length && x && x !== 'yok' && ORGS[x]).map(([, x]) => ORGS[x].label).join(', ')].filter(Boolean).join(' · ') || '—'}</td></tr>`; }).join('')}
     </tbody></table></div>`;
 }
 document.getElementById('o-search').addEventListener('input', e => { ui.search = e.target.value; renderOrders(); });
@@ -4306,7 +4312,7 @@ async function exportCutXlsx(c, title){
   const body = (r, n, opts = {}) => { for (let i = 1; i <= n; i++){ const cell = r.getCell(i); cell.font = Object.assign({name: FONT, size: 10}, opts.font || {}); cell.border = box; cell.alignment = {vertical: 'top', wrapText: i === n}; } };
   const sub = `${today()} · ${c.modules.length} modül · ölçüler mm · boy = su yönü (kaplamada)`;
   const modLabel = mod => { const i = +(String(mod).match(/^M(\d+)$/) || [])[1] - 1, m = c.modules[i]; if (!m) return mod;
-    const d = moduleDims(m, c), D = isTall(m) || isUpper(m) ? modD(m) : c.depth; return `${mod} · ${TYPES[m.type].label} · ${layoutOf(m).name}${upperGlass(m) ? (aluGlass(m) ? " (alüminyum çerçeve, füme cam)" : " (ahşap çerçeve)") : isUpper(m) && m.mirrorDoor ? " (aynalı kapak)" : ""} · ${m.width/10} × ${+(dispH(m, c)/10).toFixed(1)} × ${+(D/10).toFixed(1)} cm`; };
+    const d = moduleDims(m, c), D = isTall(m) || isUpper(m) ? modD(m) : c.depth; return `${mod} · ${TYPES[m.type].label} · ${layoutOf(m).name}${upperGlass(m) ? (glassFlush(m) ? " (çerçevesiz, rodajlı füme cam)" : aluGlass(m) ? " (alüminyum çerçeve, füme cam)" : " (ahşap çerçeve)") : isUpper(m) && m.mirrorDoor ? " (aynalı kapak)" : ""} · ${m.width/10} × ${+(dispH(m, c)/10).toFixed(1)} × ${+(D/10).toFixed(1)} cm`; };
   const m2f = (r, qc, lc, wc) => ({formula: `${qc}${r}*${lc}${r}*${wc}${r}/1000000`});
   const matKey = r => r.mat.includes(`${r.t} mm`) ? r.mat : `${r.mat} · ${r.t} mm`; // malzeme adı kalınlığı zaten içeriyorsa tekrar yazma
 
