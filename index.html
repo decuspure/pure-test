@@ -738,6 +738,13 @@ const vModel = s => VESSELS[s && s.model] || VESSELS.std, isAntao = s => !!(s &&
 const vesselH = s => vModel(s).H; // çanak yüksekliği modele göre (std 130, Antao 145 / 146)
 const vesselName = s => isAntao(s) ? `${VESSEL_BRANDS[vModel(s).brand].name} ${vModel(s).label} ${s.model}${s.color} · ${vModel(s).W} × ${vModel(s).D} × ${vModel(s).H} mm · ${ANTAO_COLORS[s.color].name}` : `Villeroy & Boch Artis 417943 · yuvarlak Ø${VESSEL.D} × ${VESSEL.H} mm · White Alpin`;
 const SINK_DEPTH = 120; // porselen eviye hazne derinliği sabit 12 cm (kullanıcı 2026-10-23)
+/* KONTRA GÖVDE (kullanıcı 2026-11-18): porselen tezgah ve entegre eviye 12 mm MARİN HUŞ KONTRA iç gövde + üstüne yapıştırılmış porselen.
+   Porselen 6 mm + yapıştırıcı 2 mm → kontra her porselen yüzden 8 mm geride (KONTRA_PAY). Birleşimler düz (alın alına, gönye yok).
+   Kalın tezgah (30 / 80 / 120): kontra üst panel tek parça + altında ön / arka / yan çıtalar; porselen üst yüz, ön alın, iki yan alın.
+   6 mm tezgah kendi kalınlığında: kontra yok. Hazne: içi porselen (taban + 4 duvar), dışı 12 mm kontra kutu, taban düz.
+   Çanak lavabonun altında tezgahta Ø180 delik (VESSEL_HOLE) */
+const SLAB_PT = 6, GLUE_T = 2, KONTRA_T = 12, KONTRA_PAY = SLAB_PT + GLUE_T, BASIN_SH = KONTRA_PAY + KONTRA_T, VESSEL_HOLE = 180;
+const kontraTop = (c = cfg) => c.top.t > SLAB_PT; // kalın tezgahta kontra gövde
 const INT_MIN_W = 600; // porselen entegre eviye en az 60 cm modülde; daha darına yalnız çanak lavabo
 /* PORSELEN EVİYE EN FAZLA GENİŞLİK (kullanıcı 2026-10-23): 60 cm modülde 50, 70 cm'de 60; daha geniş modülde kenarlardan en az 10 cm (W − 200), 60'ın altına inmez (75 cm modül 55'e düşmesin) */
 const intMaxW = W => W < 700 ? W - 100 : Math.max(600, W - 200);
@@ -782,11 +789,11 @@ const PRICE = {
   ucut:0 /* U kesim işçiliği fiyata girmez (kullanıcı) */, plinth:2 /* ayarlı baza ayağı, ADET (modül başına 4) */,
   // Blum LEGRABOX pure BLUMOTION Carbon black, takım satış € (boy + NL): çekmece (tezgah altı) ve iç çekmece (Gizli Çekmece, boy dolap iç çekmecesi)
   lgb:{M450:264.44, C450:341.08}, lgbInner:{M450:347.68, M300:342.8, C300:419.84},
-  topM2:{6:85,30:210,80:420,120:580},
+  topM2:{6:85,30:210,80:420,120:580}, kontraM2:79.32 /* 12 mm marin huş kontra SATIŞ €/m² (tezgah + hazne gövdesi; kullanıcı 2026-11-18: maliyet TL/m², 55,47 TL/€ kurla, × 4) */,
   sink:{integrated:195}, // entegre eviye ÖRNEK
   // çanak lavabo satış € (kullanıcı 2026-10-26): Artis tek renk; Antao beyaz (R1) ve mat renkler (RW, AM, R8, R7) ayrı
-  vessel:{std:554.56, '4A7240':{R1:638.45, mat:748.235}, '4A7351':{R1:688.715, mat:809.64}, '4A7465':{R1:752.015, mat:885.22}}, drain:{gizli:50, rampa:44, zarf:68}, // batarya SATILMAZ (kullanıcı 2026-10-26): fiyatta ve listelerde batarya kalemi yok; 3B'de yalnız görsel
-  mirrorM2:76, glassM2:45 /* camlı kapak camı 4 mm temperli, ÖRNEK */, aluDoor:0 /* alüminyum çerçeveli füme cam kapak, adet — fiyat sonra girilecek (kullanıcı 2026-11-10) */, mirrorBase:18, mirrorShape:{organik:1.4}, vat:.20,
+  vessel:{std:2218.24, '4A7240':{R1:2554.58, mat:2992.94}, '4A7351':{R1:2754.86, mat:3238.56}, '4A7465':{R1:3008.06, mat:3540.88}}, /* çanak SATIŞ fiyatı (kullanıcı 2026-11-18: listedeki tutarlar maliyetmiş, satış = maliyet × 4; maliyet koda yazılmaz) */ drain:{gizli:50, rampa:44, zarf:68}, // batarya SATILMAZ (kullanıcı 2026-10-26): fiyatta ve listelerde batarya kalemi yok; 3B'de yalnız görsel
+  mirrorM2:122.59 /* ayna SATIŞ €/m² (kullanıcı 2026-11-18: maliyet TL/m², 55,47 TL/€ kurla, × 4) */, glassM2:45 /* camlı kapak camı 4 mm temperli, ÖRNEK */, aluDoor:0 /* alüminyum çerçeveli füme cam kapak, adet — fiyat sonra girilecek (kullanıcı 2026-11-10) */, mirrorBase:18, mirrorShape:{organik:1.4}, vat:.20,
   // AYNA LED (kullanıcı 2026-10-26, satış €): sabit boy Flex LED (cm → €), arka çerçeve çevresine göre bir üst boy; 500 cm üstü 500 + kalan, birden çok parçada çoklayıcı; ayna başına 1 trafo 5 A 12 V
   ledStrip:{75:16.48, 100:20.6, 125:24.76, 150:28.88, 200:33, 250:45.36, 300:57.72, 400:70.12, 500:82.48}, ledSplit:{3:14.84, 6:18.16}, ledDriver:20 /* 5 A 12 V */,
   bandM:{kaplama:1, lam:0.478}, // kenar bandı satış €/m (bant enine göre fark yok); lake kenarları boyalı, bant yok
@@ -1202,7 +1209,7 @@ function warnings(c = cfg){
     const s = sinkOver(m, c);
     const hs = drawerHeights(m, c);
     if (s){
-      const prot = s.type === 'integrated' ? Math.max(0, s.depth + 12 - c.top.t) : 0;
+      const prot = s.type === 'integrated' ? Math.max(0, s.depth + BASIN_SH - c.top.t) : 0;
       if (hs[0] < prot + 90) out.push(`M${i+1}: Üst çekmece (${hs[0]/10} cm) lavabo haznesinin altında çok sığ kalıyor; ${prot} mm sarkma var.`);
     }
     if (TYPES[m.type].base){
@@ -1482,10 +1489,35 @@ function cutList(c = cfg){
   const tops = [];
   if (c.modules.length){
     const tr = topRuns(c, mx), nm = k => tr.length > 1 ? ` (${tr[k].mods.map(m => 'M' + (c.modules.indexOf(m) + 1)).join(' · ')})` : '';
+    // KONTRA GÖVDE (kullanıcı 2026-11-18): kalın tezgahta porselen 6 mm (üst yüz, ön alın, iki yan alın; düz birleşim) + 12 mm marin huş kontra
+    // (tek parça üst panel + ön / arka / yan çıtalar), kontra porselenden 8 mm geride; 6 mm tezgah kendi kalınlığında, kontra yok
+    const mmTxt = v => String(Math.round(v*10)/10).replace(".", ","), D = topD(c), T = c.top.t, P = SLAB_PT, KP = KONTRA_PAY, KT = KONTRA_T, pName = topById(c.top.color).name, kName = `Marin huş kontra ${KT} mm`;
+    const ints = intRanges(c, mx);
     tr.forEach((r, k) => {
-      tops.push({part:'Porselen tezgah' + nm(k), L:r.L, W:topD(c), t:c.top.t, mat:`${topById(c.top.color).name}`});
-      if (c.top.t > 12){ tops.push({part:'Ön düşey bant (45° birleşim)' + nm(k), L:r.L, W:c.top.t, t:12, mat:'Aynı seri'});
-        tops.push({part:'Yan düşey bant sol + sağ (45° birleşim)' + nm(k), qty:2, L:topD(c), W:c.top.t, t:12, mat:'Aynı seri'}); } }); // kalın tezgahın açık uçları (kullanıcı 2026-11-10: listeye eklensin; fiyat tezgah m² fiyatına dahil)
+      const mine = ints.filter(x => r.mods.some(m => m.uid === x.s.module)), ves = c.sinks.filter(s => s.type !== 'integrated' && r.mods.some(m => m.uid === s.module));
+      const holes = off => [...mine.map(x => `eviye deliği ${mmTxt(x.x1 - x.x0 + 2*off)} × ${mmTxt(x.z1 - x.z0 + 2*off)}`), ...ves.map(() => `çanak altı delik Ø${VESSEL_HOLE}`)].join(' · ');
+      const kalin = kontraTop(c), hp = holes(P), hk = holes(KP);
+      tops.push({part:(kalin ? 'Porselen tezgah · üst yüz' : 'Porselen tezgah') + nm(k), L:r.L, W:D, t:P, mat:pName, note:hp});
+      if (kalin){
+        tops.push({part:'Porselen ön alın' + nm(k), L:r.L, W:T - P, t:P, mat:pName, note:'Üst yüzün altında · düz birleşim'});
+        tops.push({part:'Porselen yan alın sol + sağ' + nm(k), qty:2, L:D - P, W:T - P, t:P, mat:pName, note:'Ön alının arkasında · düz birleşim'});
+        tops.push({part:'Kontra üst panel (tek parça)' + nm(k), L:r.L - 2*KP, W:D - KP, t:KT, mat:kName, kontra:true, note:['Ön ve yanlarda porselenden 8 mm geride (6 mm porselen + 2 mm yapıştırıcı) · arkası duvara', hk].filter(Boolean).join(' · ')});
+        if (T - KP - KT > 0){
+          tops.push({part:'Kontra ön / arka çıta' + nm(k), qty:2, L:r.L - 2*KP, W:T - KP - KT, t:KT, mat:kName, kontra:true, note:'Üst panelin altında, tezgah kalınlığını tamamlar'});
+          tops.push({part:'Kontra yan çıta' + nm(k), qty:2, L:D - KP - 2*KT, W:T - KP - KT, t:KT, mat:kName, kontra:true, note:'Ön ve arka çıtanın arasında'});
+        }
+      }
+      // entegre eviye haznesi: içte porselen kaplama, dışta kontra kutu (taban düz)
+      mine.forEach(x => {
+        const w = x.x1 - x.x0, d = x.z1 - x.z0, hd = x.s.depth + P, bh = x.s.depth + BASIN_SH - (kalin ? KP + KT : P), M = `M${c.modules.findIndex(m => m.uid === x.s.module) + 1}`;
+        tops.push({part:`Hazne tabanı (porselen · ${M})`, L:w, W:d, t:P, mat:pName, note:'İç ölçü · düz taban'});
+        tops.push({part:`Hazne ön / arka duvar (porselen · ${M})`, qty:2, L:w + 2*P, W:hd, t:P, mat:pName, note:'Tezgah üstünden taban altına'});
+        tops.push({part:`Hazne yan duvar (porselen · ${M})`, qty:2, L:d, W:hd, t:P, mat:pName, note:'Ön / arka duvarın arasında'});
+        tops.push({part:`Hazne kutusu tabanı (kontra · ${M})`, L:w + 2*KP, W:d + 2*KP, t:KT, mat:kName, kontra:true, note:'Porselen tabanın 2 mm altında'});
+        tops.push({part:`Hazne kutusu ön / arka (kontra · ${M})`, qty:2, L:w + 2*KP + 2*KT, W:bh, t:KT, mat:kName, kontra:true, note:kalin ? 'Kontra üst panelin altından' : 'Porselen tezgahın altından'});
+        tops.push({part:`Hazne kutusu yan (kontra · ${M})`, qty:2, L:d + 2*KP, W:bh, t:KT, mat:kName, kontra:true, note:'Ön / arkanın arasında'});
+      });
+    });
   }
   const sinksOut = c.sinks.map(s => ({s, label:SINKS[s.type].label + (s.type === 'integrated' ? ' · ' + DRAINS[s.drain] : ''), dims: s.type === 'integrated' ? `${s.w}×${s.d} · ${s.depth} mm` : vesselName(s)}));
   // SU YÖNÜ modüle özel: BOY sütunu su yönüdür. Seçilen yön varsayılandan farklıysa (çekmece kapağı yatay, boy dolap kapağı ve kapama dikey)
@@ -1535,6 +1567,7 @@ function priceOf(c = cfg){
   const hwSum = cl.hw.reduce((s,h) => s + h.qty*h.price, 0);
   const mx = moduleX(c);
   const top = topRuns(c, mx).reduce((a, r) => a + r.L, 0)*topD(c)/1e6 * PRICE.topM2[c.top.t]; // yalnız tezgahlı modüllerin üstü
+  const kontra = cl.tops.filter(t => t.kontra).reduce((s, t) => s + (t.qty || 1)*t.L*t.W/1e6, 0)*PRICE.kontraM2; // tezgah ve hazne kontra gövdesi (fiyat girilecek)
   const band = Object.values(cl.bands).reduce((s, b) => s + b.m*(PRICE.bandM[b.mat] || 0), 0);
   const bandLab = Object.values(cl.bands).reduce((s, b) => s + b.m, 0)*PRICE.bandLabor;
   const sinks = c.sinks.reduce((s,k) => s + (k.type === 'integrated' ? PRICE.sink.integrated + PRICE.drain[k.drain] : vesselPrice(k)), 0);
@@ -1547,7 +1580,7 @@ function priceOf(c = cfg){
     ['Kenar bandı işçiliği', bandLab],
     ['Çekmece sistemleri ve işçilik', hwSum],
     ['Organizerler', org],
-    ['Porselen tezgah', top],
+    ['Porselen tezgah', top + kontra], // kontra gövde (tezgah + hazne kutusu) tezgah fiyatına dahil (kullanıcı 2026-11-18)
     ['Lavabolar ve gider', sinks],
     ['Aynalar', mirrors]
   ];
@@ -1965,7 +1998,7 @@ function buildScene(){
   TOTAL_H = topH(c);
   buildRoom(mx.total);
   // tezgah altına sarkan entegre haznelerin hacmi: gövde parçaları bu hacme girmez (çentiklenir)
-  basinCut = intRanges(c, mx).filter(r => r.s.depth + 12 > c.top.t).map(r => ({x0: r.x0 - 14, x1: r.x1 + 14, z0: r.z0 - 14, z1: r.z1 + 14, yb: TOTAL_H - r.s.depth - 12 - 4}));
+  basinCut = intRanges(c, mx).filter(r => r.s.depth + BASIN_SH > c.top.t).map(r => ({x0: r.x0 - BASIN_SH - 2, x1: r.x1 + BASIN_SH + 2, z0: r.z0 - BASIN_SH - 2, z1: r.z1 + BASIN_SH + 2, yb: TOTAL_H - r.s.depth - BASIN_SH - 4}));
   c.modules.forEach((m, i) => (isUpper(m) ? buildUpper : isTall(m) ? buildTall : buildModule)(m, mx.map[m.uid].x0, i, mx));
   buildPlinths(mx);
   buildPanels(mx); // tezgahsız modüllerin üst panelleri (yan yana olanlar tek parça)
@@ -2699,8 +2732,8 @@ const hiddenFits = (m, c = cfg, mx = moduleX(c)) => !!(drawerFit(Object.assign({
 function drawerFit(m, c = cfg, mx = moduleX(c)){
   const {H, bottomY} = moduleDims(m, c), T = matT(c.body.mat), hs = drawerHeights(m, c), s = sinkOver(m, c), gola = c.handle === 'kanal';
   const xr = mx.map[m.uid], surf = topH(c);
-  const capTop = intRanges(c, mx).filter(r => r.s.depth + 12 > c.top.t).reduce((lim, r) =>
-    (r.x1 + 12 > xr.x0 && r.x0 - 12 < xr.x1) ? Math.min(lim, surf - r.s.depth - 12 - 8) : lim, Infinity);
+  const capTop = intRanges(c, mx).filter(r => r.s.depth + BASIN_SH > c.top.t).reduce((lim, r) =>
+    (r.x1 + BASIN_SH > xr.x0 && r.x0 - BASIN_SH < xr.x1) ? Math.min(lim, surf - r.s.depth - BASIN_SH - 8) : lim, Infinity);
   let yTop = bottomY + H;
   return hs.map((h, k) => {
     const yb = yTop - h; yTop = yb;
@@ -2878,10 +2911,15 @@ function buildTopRun(mx, run){
   // şekil yerel (−L/2..L/2) çizilir, tezgah ortasına (CX) taşınır; delikler yerel, hazneler dünya koordinatında
   const CX = X0 + L/2;
   ints.forEach(r => {
-    const h = new THREE.Path(), a = r.x0 - CX, b = r.x1 - CX;
-    h.moveTo(a, -r.z1); h.lineTo(a, -r.z0); h.lineTo(b, -r.z0); h.lineTo(b, -r.z1); h.lineTo(a, -r.z1);
+    // delik hazne iç ölçüsü + porselen kaplama (6 mm): kaplama duvarları tezgah üstüne kadar çıkar, düz birleşim
+    const P = SLAB_PT, h = new THREE.Path(), a = r.x0 - P - CX, b = r.x1 + P - CX, z0 = r.z0 - P, z1 = r.z1 + P;
+    h.moveTo(a, -z1); h.lineTo(a, -z0); h.lineTo(b, -z0); h.lineTo(b, -z1); h.lineTo(a, -z1);
     shape.holes.push(h);
     buildBasin(r, tg, X0);
+  });
+  // çanak lavabonun altında tezgahta Ø180 delik (kullanıcı 2026-11-18)
+  c.sinks.filter(s => s.type !== 'integrated' && run.mods.some(m => m.uid === s.module)).forEach(s => {
+    const h = new THREE.Path(); h.absarc(sinkCenterX(s, c, mx) - CX, -sinkZ(s, c), VESSEL_HOLE/2, 0, Math.PI*2, true); shape.holes.push(h);
   });
   const geo = new THREE.ExtrudeGeometry(shape, {depth: t, bevelEnabled: false});
   // plaka yönü: uzun kenar (2800) tezgah boyunca, kısa kenar (1200) derinlik + ön bant boyunca
@@ -2932,16 +2970,22 @@ const DRAIN_SLOPE = 12; // eğimli gider ve zarfta taban eğimi (mm; kullanıcı
 function buildBasin(r, tg, X0 = 0){
   const c = cfg, t = c.top.t, s = r.s, tm = topMat(), w = r.x1 - r.x0, d = r.z1 - r.z0, cx = (r.x0 + r.x1)/2, cz = (r.z0 + r.z1)/2;
   const yF = TOTAL_H - s.depth, slabB = TOTAL_H - t, sb = (...a) => slabUV(box(...a), X0); // plakadan parça
-  if (s.depth + 12 > t){
-    const yb = yF - 12, hh = slabB - yb;
-    sb(w + 24, hh, 12, tm, cx, yb + hh/2, r.z0 - 6, tg);
-    sb(w + 24, hh, 12, tm, cx, yb + hh/2, r.z1 + 6, tg);
-    sb(12, hh, d, tm, r.x0 - 6, yb + hh/2, cz, tg);
-    sb(12, hh, d, tm, r.x1 + 6, yb + hh/2, cz, tg);
-    sb(w, 12, d, tm, cx, yF - 6, cz, tg);
-    // iç yan yüzler (tezgah altına sarkan kısım)
-  } else {
-    sb(w, yF - slabB, d, tm, cx, (yF + slabB)/2, cz, tg);
+  // KONTRA GÖVDELİ HAZNE (kullanıcı 2026-11-18): içte 6 mm porselen kaplama (taban + 4 duvar; duvarlar tezgah üstünden taban altına,
+  // tezgahtaki delik iç ölçü + 6), dışta 2 mm yapıştırıcı payıyla 12 mm marin huş kontra kutu (tezgahın altından); birleşimler düz
+  const P = SLAB_PT, hP = TOTAL_H - (yF - P);
+  sb(w + 2*P, hP, P, tm, cx, TOTAL_H - hP/2, r.z0 - P/2, tg);   // arka duvar
+  sb(w + 2*P, hP, P, tm, cx, TOTAL_H - hP/2, r.z1 + P/2, tg);   // ön duvar
+  sb(P, hP, d, tm, r.x0 - P/2, TOTAL_H - hP/2, cz, tg);         // sol duvar
+  sb(P, hP, d, tm, r.x1 + P/2, TOTAL_H - hP/2, cz, tg);         // sağ duvar
+  sb(w, P, d, tm, cx, yF - P/2, cz, tg);                        // taban
+  const km = std('kontra', () => new THREE.MeshStandardMaterial({color: srgb('#dcc49a'), roughness: .85, metalness: 0, envMapIntensity: .3}));
+  const K = KONTRA_T, kw = w + 2*KONTRA_PAY, kd = d + 2*KONTRA_PAY, kb = yF - BASIN_SH, kt = slabB, kh = kt - kb;
+  if (kh > K){
+    box(kw, K, kd, km, cx, kb + K/2, cz, tg);                                    // kutu tabanı (porselen tabanın 2 mm altında)
+    box(kw + 2*K, kh, K, km, cx, kb + kh/2, r.z0 - KONTRA_PAY - K/2, tg);         // arka
+    box(kw + 2*K, kh, K, km, cx, kb + kh/2, r.z1 + KONTRA_PAY + K/2, tg);         // ön
+    box(K, kh, kd, km, r.x0 - KONTRA_PAY - K/2, kb + kh/2, cz, tg);               // sol
+    box(K, kh, kd, km, r.x1 + KONTRA_PAY + K/2, kb + kh/2, cz, tg);               // sağ
   }
   // kapak altı (su yolu): siyah boya gibi değil, gölgede kalan koyu ton; derzin kendisi kapak etrafındaki yumuşak gölgeyle (gapShadow) seçilir
   const underM = std('drainUnder', () => new THREE.MeshStandardMaterial({color: srgb('#5d5a55'), roughness: 1, metalness: 0, envMapIntensity: .1}));
@@ -3026,7 +3070,7 @@ function buildSink(s, mx){
   }
   // sifon
   const drainZ = s.type === 'integrated' && s.drain !== 'zarf' ? backZ + 22 : cz;
-  const yTopPipe = s.type === 'integrated' ? Math.min(TOTAL_H - c.top.t, TOTAL_H - s.depth - 12) : TOTAL_H - topT(c);
+  const yTopPipe = s.type === 'integrated' ? Math.min(TOTAL_H - c.top.t, TOTAL_H - s.depth - BASIN_SH) : TOTAL_H - topT(c);
   // sifon üst çekmecenin U kanalı içinde kalır: kısa düşüş, sonra duvara
   // sifon KROM (kullanıcı 2026-10-17): dolabın içinde kaldığı için açık ortam yansıması onu beyaz gösteriyordu —
   // ayrı krom malzeme: yansıma kısık, ton koyu gümüş, keskin parlama (dolap içi karanlık ortamı yansıtır gibi)
@@ -3460,7 +3504,7 @@ function sinkEditor(s, mx){
     <p class="hint" style="margin:0 0 10px">${vesselName(s)} · tezgah üstü ${String(topH()/10).replace('.', ',')} cm, çanak üst kotu ${String((topH() + vesselH(s))/10).replace('.', ',')} cm</p>` : `
     <div class="field"><label for="sk-w-${id}">Genişlik <span class="muted">en fazla ${intMaxW((cfg.modules.find(x => x.uid === s.module) || {}).width || 1200)/10} cm</span></label><select id="sk-w-${id}" data-s="${id}" data-f="w">${(() => { // açılır liste (kullanıcı 2026-10-23; eskiden sürgü): 40–120 cm, 5 cm adım; kayıtlı ara değer de listede kalır
       const mw = intMaxW((cfg.modules.find(x => x.uid === s.module) || {}).width || 1200), o = []; for (let v = 400; v <= mw; v += 50) o.push(v); if (!o.includes(s.w)) o.push(s.w); return o.sort((a, b) => a - b).map(v => `<option value="${v}" ${v === s.w ? 'selected' : ''}>${+(v/10).toFixed(1)} cm</option>`).join(''); })()}</select></div>
-    <p class="hint" style="margin:0 0 10px">Ön-arka ${INT_D/10} cm · tezgah önünden ${INT_FRONT/10} cm geride başlar, arkada ${String((topD() - INT_FRONT - INT_D)/10).replace('.', ',')} cm batarya payı${s.depth + 12 > cfg.top.t ? ` · hazne ${s.depth + 12 - cfg.top.t} mm tezgah altına sarkar, altındaki çekmece U kesimli` : ''}</p>
+    <p class="hint" style="margin:0 0 10px">Ön-arka ${INT_D/10} cm · tezgah önünden ${INT_FRONT/10} cm geride başlar, arkada ${String((topD() - INT_FRONT - INT_D)/10).replace('.', ',')} cm batarya payı${s.depth + BASIN_SH > cfg.top.t ? ` · hazne ${s.depth + BASIN_SH - cfg.top.t} mm tezgah altına sarkar, altındaki çekmece U kesimli` : ''}</p>
     <p class="hint" style="margin:0 0 10px">Hazne derinliği sabit ${SINK_DEPTH/10} cm</p>
     <div class="field"><label for="sk-dr-${id}">Gider</label><select id="sk-dr-${id}" data-s="${id}" data-f="drain">${Object.entries(DRAINS).map(([k, v]) => `<option value="${k}" ${s.drain === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`}
     <div class="seg"><button data-act="sink-f" data-id="${id}" data-f="faucet" data-v="delikli" aria-pressed="${s.faucet === 'delikli'}">Batarya delikli</button><button data-act="sink-f" data-id="${id}" data-f="faucet" data-v="deliksiz" aria-pressed="${s.faucet === 'deliksiz'}">Deliksiz</button></div>
@@ -4348,9 +4392,9 @@ async function exportCutXlsx(c, title){
       cl.rows.filter(r => r.mod === mod).map((r, k) => ({r, k})).sort((a, b) => CUT_CATS.indexOf(cutCat(a.r.part)) - CUT_CATS.indexOf(cutCat(b.r.part)) || a.k - b.k).forEach(({r}) => {
         const row = ws.addRow([++no, cutCat(r.part), r.part, r.qty, r.L, r.W, r.t, r.mat, r.band ? r.band[0] : 0, r.band ? r.band[1] : 0, null, r.note || '']);
         row.getCell(11).value = Object.assign(m2f(row.number, 'D', 'E', 'F'), {result: Math.round(r.qty*r.L*r.W/1e3)/1e3}); row.getCell(11).numFmt = '0.000'; body(row, N - 1); }); });
-    if (cl.tops.length){ group(ws, 'Porselen tezgah', N - 1);
-      cl.tops.forEach(t => { const row = ws.addRow([++no, 'Tezgah', t.part, t.qty || 1, t.L, t.W, t.t, t.mat, 0, 0, null, '']);
-        row.getCell(11).value = Object.assign(m2f(row.number, 'D', 'E', 'F'), {result: Math.round(t.L*t.W/1e3)/1e3}); row.getCell(11).numFmt = '0.000'; body(row, N - 1); }); } }
+    if (cl.tops.length){ group(ws, 'Tezgah ve hazne (porselen + kontra)', N - 1);
+      cl.tops.forEach(t => { const row = ws.addRow([++no, t.kontra ? 'Kontra' : 'Tezgah', t.part, t.qty || 1, t.L, t.W, t.t, t.mat, 0, 0, null, t.note || '']);
+        row.getCell(11).value = Object.assign(m2f(row.number, 'D', 'E', 'F'), {result: Math.round((t.qty || 1)*t.L*t.W/1e3)/1e3}); row.getCell(11).numFmt = '0.000'; body(row, N - 1); }); } }
 
   // ---- 3. KESİM LİSTESİ (malzeme + kalınlığa göre) ----
   { const N = 11, ws = sheet('Kesim listesi', [5, 40, 9, 6, 9, 9, 7, 7, 9, 40, 1], 4); titleRows(ws, N - 1, sub + ' · plaka / kalınlık gruplu');
@@ -4393,14 +4437,14 @@ function openCutList(c, title){
   const bandTxt = b => b && (b[0] || b[1]) ? [b[0] ? b[0] + '×boy' : '', b[1] ? b[1] + '×en' : ''].filter(Boolean).join(' + ') : '—';
   const dec = v => String(v).replace('.', ','); // ondalık virgül (283,5)
   const csv = ['Parça;Modül;Adet;Boy;En;Kalınlık;Malzeme;Kenar bandı;Not'].concat(cl.rows.map(r => [r.part, r.mod, r.qty, dec(r.L), dec(r.W), dec(r.t), r.mat, bandTxt(r.band), r.note].join(';')))
-    .concat(cl.tops.map(t => [t.part, '-', t.qty || 1, t.L, t.W, t.t, t.mat, '', ''].join(';'))).join('\n');
+    .concat(cl.tops.map(t => [t.part, '-', t.qty || 1, t.L, t.W, t.t, t.mat, '', t.note || ''].join(';'))).join('\n');
   const area = {}; cl.rows.forEach(r => { const k = r.mat.includes(`${r.t} mm`) ? r.mat : `${r.mat} · ${r.t} mm`; area[k] = (area[k] || 0) + r.qty*r.L*r.W/1e6; }); // kalınlık adda varsa tekrar yazılmaz (Excel matKey ile aynı)
   openDialog(`
     <div class="row sp"><h3>Parça listesi · ${esc(title)}</h3><div class="row"><button class="btn sm primary" data-oact="xlsx">Excel indir</button><button class="btn sm" data-oact="copy-csv">CSV kopyala</button><button class="btn sm" data-close>Kapat</button></div></div>
     <textarea id="csv-src" hidden rows="4">${esc(csv)}</textarea>
     <div class="tbl-wrap"><table><thead><tr><th>Parça</th><th>Modül</th><th>Adet</th><th>Boy</th><th>En</th><th>Kal.</th><th>Malzeme</th><th>Bant</th><th>Not</th></tr></thead><tbody>
     ${cl.rows.map(r => `<tr><td>${esc(r.part)}</td><td class="mono">${r.mod}</td><td class="n">${r.qty}</td><td class="n">${dec(r.L)}</td><td class="n">${dec(r.W)}</td><td class="n">${dec(r.t)}</td><td>${esc(r.mat)}</td><td class="mono">${bandTxt(r.band)}</td><td class="muted">${esc(r.note)}</td></tr>`).join('')}
-    ${cl.tops.map((t, i) => `<tr><td>${esc(t.part)}</td><td class="mono">—</td><td class="n">${t.qty || 1}</td><td class="n">${t.L}</td><td class="n">${t.W}</td><td class="n">${t.t}</td><td>${esc(t.mat)}</td><td class="mono">—</td><td class="muted">${i === 0 && cl.sinksOut.filter(s => s.s.type === 'integrated').length ? 'Entegre hazne işlemesi' : ''}</td></tr>`).join('')}
+    ${cl.tops.map((t, i) => `<tr><td>${esc(t.part)}</td><td class="mono">—</td><td class="n">${t.qty || 1}</td><td class="n">${t.L}</td><td class="n">${t.W}</td><td class="n">${t.t}</td><td>${esc(t.mat)}</td><td class="mono">—</td><td class="muted">${esc(t.note || '')}</td></tr>`).join('')}
     </tbody></table></div>
     <div class="grid2">
       <div><h2 class="sec">Malzeme alanı</h2><div class="tbl-wrap"><table><tbody>${Object.entries(area).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${v.toFixed(2)} m²</td></tr>`).join('')}</tbody></table></div>
