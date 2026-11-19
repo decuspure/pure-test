@@ -801,28 +801,32 @@ const PRICE = {
 };
 const lakeM2 = (k, col) => { const L = PRICE.lake; return (L.mdf[k] || 0) + L.faces*(L.astar + L.tiner + (L.boya[col] || 0) + L.labor); };
 const vesselPrice = s => { const p = PRICE.vessel[s.model] ?? PRICE.vessel.std; return typeof p === 'number' ? p : (s.color === 'R1' ? p.R1 : p.mat); };
-/* ayna LED'i: arka taşıyıcının (ayna − 40 mm) çevresi; sabit boylardan bir üstü (ör. 245 → 250 cm), 500 cm üstünde 500'lükler + kalan; parça > 1 ise çoklayıcı (3'lü / 6'lı); 1 trafo */
+/* ayna LED'i: panel arkasındaki LED kanalının (kenardan LED_IN = 29 mm) çevresi; sabit boylardan bir üstü (ör. 245 → 250 cm), 500 cm üstünde 500'lükler + kalan; parça > 1 ise çoklayıcı (3'lü / 6'lı); 1 trafo */
 function ledParts(mi){
-  const need = Math.ceil(mirrorShape(mi.shape, mi.w - 40, mi.h - 40).getLength()/10), sizes = Object.keys(PRICE.ledStrip).map(Number).sort((a, b) => a - b), max = sizes[sizes.length - 1];
+  const need = Math.ceil(mirrorShape(mi.shape, mi.w - 2*LED_IN, mi.h - 2*LED_IN).getLength()/10), sizes = Object.keys(PRICE.ledStrip).map(Number).sort((a, b) => a - b), max = sizes[sizes.length - 1];
   const strips = []; let rest = need; while (rest > max){ strips.push(max); rest -= max; } strips.push(sizes.find(s => s >= rest));
   const split = strips.length > 1 ? (strips.length <= 3 ? 3 : 6) : 0;
   const price = strips.reduce((a, s) => a + PRICE.ledStrip[s], 0) + (split ? PRICE.ledSplit[split] : 0) + PRICE.ledDriver;
   const text = `Flex LED ${strips.map(s => s + ' cm').join(' + ')} (çevre ${need} cm)${split ? ` · ${split}'${split === 3 ? 'lü' : 'lı'} çoklayıcı` : ''} · 5 A 12 V trafo`;
   return {need, strips, split, price, text};
 }
-/* AYNA ÜRETİMİ (kullanıcının üretim çizimi 2026-11-19, Ø1000 yuvarlak): önde 4 mm standart düz ayna; arkasında 18 mm HAM MDF (aynanın biçiminde,
-   kenardan 20 mm içeride — LED bu MDF'nin kenarında, `ledParts` aynı çevre); arkada 18 mm ham MDF'den 45° kesilmiş iki karkas (biri aynaya / MDF'ye
-   sabit, biri duvara; fransız askı), boy ≈ ayna eninin yarısı (Ø1000'de ~490), en 90 mm. Fiyat: cam m² × mirrorM2 + MDF m² × ham MDF 18
-   (`PRICE.lake.mdf.lake18`) + LED (Flex LED + trafo). Eski örnek ayna başına 18 € ve organik × 1,4 kaldırıldı */
-const MIRROR_IN = 20, CLEAT_W = 90;
+/* AYNA ÜRETİMİ (kullanıcının üretim çizimleri aynalar.dwg, 2026-11-19; DÜZ AYNALAR 2 = 400 × 1200, 3 = Ø1000 — çıtalı / çerçeveli 4–7 baz alınmadı):
+   önden — 4 mm standart düz ayna; 18 mm HAM MDF PANEL aynanın biçiminde TAM BOY ("ayna arkası 1 adet"); panelin arkasında kenardan 26,4–32 mm'de
+   5,6 mm LED KANALI (LED_IN = kanal ortası 29 mm; `ledParts` bu çevre) ve trafo için 5 mm derin yuva; arkada 18 mm ham MDF KARKAS GİZLEME çerçevesi
+   (dış kenarı aynadan MIRROR_RING = 45 mm içeride, 18 mm genişlik, 18 mm derin; dikdörtgende 4 parça 45° gönye, yuvarlakta tek parça), içinde
+   45° KESİLMİŞ İKİ KARKAS (18 mm ham MDF, her biri 100 mm; biri aynaya, biri duvara sabit — fransız askı, aynı 18 mm katmanda), boy = çerçeve içi − 2
+   (400'lükte 272), en fazla 472 (Ø1000'de 472). Ayna yüzü duvardan 40 mm. Fiyat: cam m² × mirrorM2 + (panel + çerçeve + karkas) m² × ham MDF 18
+   (`PRICE.lake.mdf.lake18`) + LED. Eski örnek ayna başına 18 € ve organik × 1,4 kaldırıldı */
+const MIRROR_RING = 45, LED_IN = 29, CLEAT_H = 100, CLEAT_MAX = 472;
 const shapeM2 = (type, w, h) => Math.abs(THREE.ShapeUtils.area(mirrorShape(type, w, h).getPoints(96)))/1e6;
 function mirrorParts(mi){
-  const glass = shapeM2(mi.shape, mi.w, mi.h), back = shapeM2(mi.shape, mi.w - 2*MIRROR_IN, mi.h - 2*MIRROR_IN);
-  const cl = Math.max(200, Math.min(800, Math.round(mi.w*.49/10)*10)), cleat = 2*cl*CLEAT_W/1e6, mdf = PRICE.lake.mdf.lake18, led = mi.led ? ledParts(mi) : null;
-  const price = glass*PRICE.mirrorM2 + (back + cleat)*mdf + (led ? led.price : 0);
+  const glass = shapeM2(mi.shape, mi.w, mi.h), panel = glass;
+  const ring = shapeM2(mi.shape, mi.w - 2*MIRROR_RING, mi.h - 2*MIRROR_RING) - shapeM2(mi.shape, mi.w - 2*(MIRROR_RING + 18), mi.h - 2*(MIRROR_RING + 18));
+  const cl = Math.max(100, Math.min(CLEAT_MAX, mi.w - 2*(MIRROR_RING + 18) - 2)), cleat = 2*cl*CLEAT_H/1e6, mdf = PRICE.lake.mdf.lake18, led = mi.led ? ledParts(mi) : null;
+  const price = glass*PRICE.mirrorM2 + (panel + ring + cleat)*mdf + (led ? led.price : 0);
   const f = v => v.toFixed(2).replace('.', ',');
-  const text = `4 mm düz ayna ${f(glass)} m² · arkası 18 mm ham MDF (kenardan ${MIRROR_IN} mm içeride) ${f(back)} m² · 45° karkas 2 × ${cl} × ${CLEAT_W} (18 mm ham MDF; biri aynaya, biri duvara)`;
-  return {glass, back, cleat, cl, led, price, text};
+  const text = `4 mm düz ayna ${f(glass)} m² · arkası 18 mm ham MDF panel (tam boy, LED kanalı + trafo yuvası) · karkas gizleme çerçevesi 18 mm ham MDF (kenardan ${MIRROR_RING} mm içeride, 18 mm) · 45° karkas 2 × ${cl} × ${CLEAT_H} (biri aynaya, biri duvara) · duvardan 40 mm`;
+  return {glass, panel, ring, cleat, cl, led, price, text};
 }
 const golaPrice = (fin, L) => (fin === 'front' ? PRICE.golaM.front : PRICE.golaM.alu)*L/1000; // profil boyu (mm) × €/m
 
@@ -3299,10 +3303,16 @@ function ledGlowMat(shape, w, h){
 function buildMirror(mi){
   const g = new THREE.Group(); g.userData.mirror = mi.uid; root.add(g);
   const y = mi.bottom + mi.h/2, shape = mirrorShape(mi.shape, mi.w, mi.h);
-  const geo = new THREE.ExtrudeGeometry(shape, {depth:6, bevelEnabled:true, bevelThickness:1, bevelSize:1, bevelSegments:1, curveSegments:48});
-  const m = new THREE.Mesh(geo, M.mirror); m.position.set(mi.x, y, 22); m.castShadow = true; g.add(m); addEdges(m, 30);
-  const back = new THREE.Mesh(new THREE.ExtrudeGeometry(mirrorShape(mi.shape, mi.w - 40, mi.h - 40), {depth:18, bevelEnabled:false, curveSegments:32}), M.dark);
-  back.position.set(mi.x, y, 3); g.add(back);
+  // ÜRETİM ÇİZİMİ (aynalar.dwg 2026-11-19): duvardan öne — 18 mm karkas gizleme çerçevesi (kenardan MIRROR_RING içeride, 18 mm genişlik; içinde 45° karkaslar),
+  // 18 mm ham MDF panel (aynanın biçiminde, tam boy; arkasında LED kanalı), 4 mm ayna → ayna yüzü duvardan 40 mm
+  const geo = new THREE.ExtrudeGeometry(shape, {depth:3, bevelEnabled:true, bevelThickness:.5, bevelSize:.5, bevelSegments:1, curveSegments:48});
+  const m = new THREE.Mesh(geo, M.mirror); m.position.set(mi.x, y, 36.5); m.castShadow = true; g.add(m); addEdges(m, 30);
+  const panel = new THREE.Mesh(new THREE.ExtrudeGeometry(mirrorShape(mi.shape, mi.w, mi.h), {depth:18, bevelEnabled:false, curveSegments:48}), M.dark);
+  panel.position.set(mi.x, y, 18); g.add(panel);
+  const ro = mirrorShape(mi.shape, mi.w - 2*MIRROR_RING, mi.h - 2*MIRROR_RING), ri = mirrorShape(mi.shape, mi.w - 2*(MIRROR_RING + 18), mi.h - 2*(MIRROR_RING + 18));
+  ro.holes.push(new THREE.Path(ri.getPoints(64).reverse()));
+  const ring = new THREE.Mesh(new THREE.ExtrudeGeometry(ro, {depth:18, bevelEnabled:false, curveSegments:48}), M.dark);
+  ring.position.set(mi.x, y, 0); g.add(ring);
   if (mi.led){ // arkadan LED: duvarda aynanın formunda, kenara doğru yumuşakça sönen hale
     const pad = LED_PAD, glow = new THREE.Mesh(new THREE.PlaneGeometry(mi.w + 2*pad, mi.h + 2*pad), ledGlowMat(mi.shape, mi.w, mi.h));
     glow.position.set(mi.x, y, 1.5); glow.raycast = () => {}; g.add(glow);
