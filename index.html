@@ -793,7 +793,7 @@ const PRICE = {
   sink:{integrated:195}, // entegre eviye ÖRNEK
   // çanak lavabo satış € (kullanıcı 2026-10-26): Artis tek renk; Antao beyaz (R1) ve mat renkler (RW, AM, R8, R7) ayrı
   vessel:{std:2218.24, '4A7240':{R1:2554.58, mat:2992.94}, '4A7351':{R1:2754.86, mat:3238.56}, '4A7465':{R1:3008.06, mat:3540.88}}, /* çanak SATIŞ fiyatı (kullanıcı 2026-11-18: listedeki tutarlar maliyetmiş, satış = maliyet × 4; maliyet koda yazılmaz) */ drain:{gizli:50, rampa:44, zarf:68}, // batarya SATILMAZ (kullanıcı 2026-10-26): fiyatta ve listelerde batarya kalemi yok; 3B'de yalnız görsel
-  mirrorM2:122.59 /* ayna SATIŞ €/m² (kullanıcı 2026-11-18: maliyet TL/m², 55,47 TL/€ kurla, × 4) */, glassM2:45 /* camlı kapak camı 4 mm temperli, ÖRNEK */, aluDoor:0 /* alüminyum çerçeveli füme cam kapak, adet — fiyat sonra girilecek (kullanıcı 2026-11-10) */, mirrorBase:18, mirrorShape:{organik:1.4}, vat:.20,
+  mirrorM2:122.59 /* ayna SATIŞ €/m² (kullanıcı 2026-11-18: maliyet TL/m², 55,47 TL/€ kurla, × 4) */, glassM2:45 /* camlı kapak camı 4 mm temperli, ÖRNEK */, aluDoor:0 /* alüminyum çerçeveli füme cam kapak, adet — fiyat sonra girilecek (kullanıcı 2026-11-10) */, vat:.20,
   // AYNA LED (kullanıcı 2026-10-26, satış €): sabit boy Flex LED (cm → €), arka çerçeve çevresine göre bir üst boy; 500 cm üstü 500 + kalan, birden çok parçada çoklayıcı; ayna başına 1 trafo 5 A 12 V
   ledStrip:{75:16.48, 100:20.6, 125:24.76, 150:28.88, 200:33, 250:45.36, 300:57.72, 400:70.12, 500:82.48}, ledSplit:{3:14.84, 6:18.16}, ledDriver:20 /* 5 A 12 V */,
   bandM:{kaplama:1, lam:0.478}, // kenar bandı satış €/m (bant enine göre fark yok); lake kenarları boyalı, bant yok
@@ -809,6 +809,20 @@ function ledParts(mi){
   const price = strips.reduce((a, s) => a + PRICE.ledStrip[s], 0) + (split ? PRICE.ledSplit[split] : 0) + PRICE.ledDriver;
   const text = `Flex LED ${strips.map(s => s + ' cm').join(' + ')} (çevre ${need} cm)${split ? ` · ${split}'${split === 3 ? 'lü' : 'lı'} çoklayıcı` : ''} · 5 A 12 V trafo`;
   return {need, strips, split, price, text};
+}
+/* AYNA ÜRETİMİ (kullanıcının üretim çizimi 2026-11-19, Ø1000 yuvarlak): önde 4 mm standart düz ayna; arkasında 18 mm HAM MDF (aynanın biçiminde,
+   kenardan 20 mm içeride — LED bu MDF'nin kenarında, `ledParts` aynı çevre); arkada 18 mm ham MDF'den 45° kesilmiş iki karkas (biri aynaya / MDF'ye
+   sabit, biri duvara; fransız askı), boy ≈ ayna eninin yarısı (Ø1000'de ~490), en 90 mm. Fiyat: cam m² × mirrorM2 + MDF m² × ham MDF 18
+   (`PRICE.lake.mdf.lake18`) + LED (Flex LED + trafo). Eski örnek ayna başına 18 € ve organik × 1,4 kaldırıldı */
+const MIRROR_IN = 20, CLEAT_W = 90;
+const shapeM2 = (type, w, h) => Math.abs(THREE.ShapeUtils.area(mirrorShape(type, w, h).getPoints(96)))/1e6;
+function mirrorParts(mi){
+  const glass = shapeM2(mi.shape, mi.w, mi.h), back = shapeM2(mi.shape, mi.w - 2*MIRROR_IN, mi.h - 2*MIRROR_IN);
+  const cl = Math.max(200, Math.min(800, Math.round(mi.w*.49/10)*10)), cleat = 2*cl*CLEAT_W/1e6, mdf = PRICE.lake.mdf.lake18, led = mi.led ? ledParts(mi) : null;
+  const price = glass*PRICE.mirrorM2 + (back + cleat)*mdf + (led ? led.price : 0);
+  const f = v => v.toFixed(2).replace('.', ',');
+  const text = `4 mm düz ayna ${f(glass)} m² · arkası 18 mm ham MDF (kenardan ${MIRROR_IN} mm içeride) ${f(back)} m² · 45° karkas 2 × ${cl} × ${CLEAT_W} (18 mm ham MDF; biri aynaya, biri duvara)`;
+  return {glass, back, cleat, cl, led, price, text};
 }
 const golaPrice = (fin, L) => (fin === 'front' ? PRICE.golaM.front : PRICE.golaM.alu)*L/1000; // profil boyu (mm) × €/m
 
@@ -1644,7 +1658,7 @@ function priceOf(c = cfg){
   const band = Object.values(cl.bands).reduce((s, b) => s + b.m*(PRICE.bandM[b.mat] || 0), 0);
   const bandLab = Object.values(cl.bands).reduce((s, b) => s + b.m, 0)*PRICE.bandLabor;
   const sinks = c.sinks.reduce((s,k) => s + (k.type === 'integrated' ? PRICE.sink.integrated + PRICE.drain[k.drain] : vesselPrice(k)), 0);
-  const mirrors = c.mirrors.reduce((s,m) => s + (m.w*m.h/1e6)*PRICE.mirrorM2*(PRICE.mirrorShape[m.shape] || 1) + (m.led ? ledParts(m).price : 0) + PRICE.mirrorBase, 0);
+  const mirrors = c.mirrors.reduce((s, m) => s + mirrorParts(m).price, 0); // cam + 18 mm ham MDF arka + 45° karkas + LED (üretim çizimi 2026-11-19)
   const lines = [
     ['Gövde ve iç parçalar', carcass],
     ['Kapaklar', fronts],
@@ -4487,7 +4501,7 @@ async function exportCutXlsx(c, title){
       r.getCell(4).numFmt = r.getCell(5).numFmt = '#,##0.00 "€"'; body(r, N - 1); };
     cl.hw.forEach(h => add(h.mod, h.item, h.qty, h.price || 0));
     cl.sinksOut.forEach(s => add('—', `${s.label} · ${s.dims}${s.s.faucet === 'delikli' ? ' · tezgahta batarya deliği' : ''}`, 1, null));
-    c.mirrors.forEach(m => add('—', `Ayna ${MIRRORS[m.shape]} ${m.w}×${m.h}${m.led ? ' + ' + LED_TXT + ' · ' + ledParts(m).text : ''}`, 1, null));
+    c.mirrors.forEach(m => add('—', `Ayna ${MIRRORS[m.shape]} ${m.w}×${m.h} · ${mirrorParts(m).text}${m.led ? ' + ' + LED_TXT + ' · ' + ledParts(m).text : ''}`, 1, null));
     const t = ws.addRow(['', 'Toplam', '', '', {formula: `SUM(E${f}:E${ws.rowCount})`, result: Math.round(cl.hw.reduce((a, h) => a + h.qty*(h.price || 0), 0)*100)/100}]);
     t.getCell(5).numFmt = '#,##0.00 "€"'; body(t, N - 1, {font: {bold: true}});
     ws.addRow([]); const n = ws.addRow(['', 'Lavabo ve ayna fiyatları Özet sayfasındaki dökümde.']); n.getCell(2).font = {name: FONT, size: 9, italic: true, color: {argb: 'FF666666'}}; }
@@ -4526,7 +4540,7 @@ function openCutList(c, title){
         <p class="hint" style="margin:6px 0 0">Net metraj (fire hariç); bant kendi kenarı boyunca (su yönü). Lake parçalarda kenarlar boyalı.</p></div>
       <div><h2 class="sec">Donanım ve aksesuar</h2><div class="tbl-wrap"><table><tbody>${cl.hw.map(h => `<tr><td class="mono">${h.mod}</td><td>${esc(h.item)}</td><td class="n">${h.qty}</td></tr>`).join('')}
         ${cl.sinksOut.map(s => `<tr><td class="mono">—</td><td>${esc(s.label)} · ${s.dims}${s.s.faucet === 'delikli' ? ' · tezgahta batarya deliği' : ''}</td><td class="n">1</td></tr>`).join('')}
-        ${c.mirrors.map(m => `<tr><td class="mono">—</td><td>Ayna ${MIRRORS[m.shape]} ${m.w}×${m.h}${m.led ? ' + ' + LED_TXT + ' · ' + ledParts(m).text : ''}</td><td class="n">1</td></tr>`).join('')}</tbody></table></div></div>
+        ${c.mirrors.map(m => `<tr><td class="mono">—</td><td>Ayna ${MIRRORS[m.shape]} ${m.w}×${m.h} · ${mirrorParts(m).text}${m.led ? ' + ' + LED_TXT + ' · ' + ledParts(m).text : ''}</td><td class="n">1</td></tr>`).join('')}</tbody></table></div></div>
     </div>`);
 }
 
