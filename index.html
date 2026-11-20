@@ -797,7 +797,9 @@ const PRICE = {
   // AYNA LED (kullanıcı 2026-10-26, satış €): sabit boy Flex LED (cm → €), arka çerçeve çevresine göre bir üst boy; 500 cm üstü 500 + kalan, birden çok parçada çoklayıcı; ayna başına 1 trafo 5 A 12 V
   ledStrip:{75:16.48, 100:20.6, 125:24.76, 150:28.88, 200:33, 250:45.36, 300:57.72, 400:70.12, 500:82.48}, ledSplit:{3:14.84, 6:18.16}, ledDriver:20 /* 5 A 12 V */,
   bandM:{kaplama:1, lam:0.478}, // kenar bandı satış €/m (bant enine göre fark yok); lake kenarları boyalı, bant yok
-  bandLabor:0.96 // bant yapıştırma işçiliği €/m (bantlı her metre)
+  bandLabor:0.96, // bant yapıştırma işçiliği €/m (bantlı her metre)
+  // Vauth-Sagel SATIŞ € (kullanıcı 2026-11-20: maliyet € × 4): VS TAL Gate KOMPLE SET (1450–1700 maliyet 510,27 / 1700–1950 maliyet 587,11), ENVI Space XX Pro çamaşır sepeti modele göre (300 189,35 · 400 211,37 · 450 258,01 · 600 287,97)
+  talGate:{b1k150:2041.08, b1k175:2348.44}, envi:{300:757.4, 400:845.48, 450:1032.04, 600:1151.88}
 };
 const lakeM2 = (k, col) => { const L = PRICE.lake; return (L.mdf[k] || 0) + L.faces*(L.astar + L.tiner + (L.boya[col] || 0) + L.labor); };
 const vesselPrice = s => { const p = PRICE.vessel[s.model] ?? PRICE.vessel.std; return typeof p === 'number' ? p : (s.color === 'R1' ? p.R1 : p.mat); };
@@ -1474,12 +1476,12 @@ function cutList(c = cfg){
       hw.push({item:'Gizli askı mekanizması', mod, qty:2, price:0});
       if (nSh) hw.push({item:'Raf pimi', mod, qty:4*nSh, price:PRICE.pin});
       if (tallWash(m)){ const wm = washModel(W), wd = WASH[wm]; // Vauth-Sagel ENVI Space XX Pro, beyaz (makroaks.com.tr)
-        hw.push({item:`Vauth-Sagel ENVI Space XX Pro ${wd.name} (${wd.code}) · tam açılım, yavaşlatıcılı, sürgülü üst kapak · istenen renk çekmecelerle aynı (Carbon black), tedarikçiden teyit · ${wm}'lük model${W > wm + 20 ? ` · iki yanda ${(W - wm)/2} mm dolgu` : ''}`, mod, qty:1, price:0}); }
+        hw.push({item:`Vauth-Sagel ENVI Space XX Pro ${wd.name} (${wd.code}) · tam açılım, yavaşlatıcılı, sürgülü üst kapak · istenen renk çekmecelerle aynı (Carbon black), tedarikçiden teyit · ${wm}'lük model${W > wm + 20 ? ` · iki yanda ${(W - wm)/2} mm dolgu` : ''}`, mod, qty:1, price:PRICE.envi[wm] || 0}); }
       if (tallPantry(m)){ const tg = TYPES[m.type].tg, nT = TYPES[m.type].trays; // Vauth-Sagel VS TAL Gate Planero Lava (antrasit), 45'lik kapak — makroaks.com.tr ürün listesi
-        hw.push({item:`Vauth-Sagel VS TAL Gate ray mekanizması Lava (90007610) · kiler ${tg.set}, 45'lik kapak · kapakla birlikte açılır`, mod, qty:1, price:0});
-        hw.push({item:`Vauth-Sagel VS TAL Gate ${tg.frame[1]} Lava (${tg.frame[0]})`, mod, qty:1, price:0});
-        hw.push({item:`Vauth-Sagel VS TAL Gate kapak bağlantısı 450 mm Lava (90006716)`, mod, qty:1, price:0});
-        hw.push({item:`Vauth-Sagel Planero sepet Lava 450 mm (90007982)`, mod, qty:nT, price:0}); }
+        hw.push({item:`Vauth-Sagel VS TAL Gate ray mekanizması Lava (90007610) · kiler ${tg.set}, 45'lik kapak · kapakla birlikte açılır · KOMPLE SET (mekanizma + çerçeve + kapak bağlantısı + sepetler)`, mod, qty:1, price:PRICE.talGate[m.type] || 0});
+        hw.push({item:`Vauth-Sagel VS TAL Gate ${tg.frame[1]} Lava (${tg.frame[0]}) · sete dahil`, mod, qty:1, price:0});
+        hw.push({item:`Vauth-Sagel VS TAL Gate kapak bağlantısı 450 mm Lava (90006716) · sete dahil`, mod, qty:1, price:0});
+        hw.push({item:`Vauth-Sagel Planero sepet Lava 450 mm (90007982) · sete dahil`, mod, qty:nT, price:0}); }
       if (gola) hw.push({item:`Gola C profil 74×26 (iki kapak arası) · ${m.kanalFin === 'front' ? 'ahşap · su yönü profil boyunca · ' + colorName(c.front.mat, c.front.color) : 'alüminyum (siyah)'} · boy ${W} mm`, mod, qty:1, price:golaPrice(m.kanalFin, W)});
       if (th === 'kulp') hw.push({item:`Çubuk kulp 160 mm (dikey) · ${HANDLE_COLORS[m.handleColor].label}`, mod, qty: one ? 1 : 2, price:PRICE.pull});
       if (th === 'push') hw.push({item:'Blum TIP-ON (kapak, push-open)', mod, qty: one ? 1 : 2, price:PRICE.tipOn});
@@ -3570,7 +3572,8 @@ function renderLeft(){
       <p class="hint" style="margin:6px 0 0">${tsel.every(modTop) ? 'Bu modülün üstünde tezgah var. Kaldırılırsa üstü üst tablayla kapanır; istenirse <b>Kapama</b> sekmesinden üst panel eklenir, lavabosu silinir.' : 'Bu modülde tezgah yok; işaretlenince tezgah eklenir (yan yana tezgahlı modüllerde tek parça).'}</p>`
       : `<p class="hint" style="margin:0">${selM && (isTall(selM) || isUpper(selM)) ? 'Boy dolapta ve üst modülde tezgah olmaz.' : cms.length ? 'Tezgahı eklemek ya da kaldırmak için 3B görünümde veya alttaki M etiketlerinden bir tezgah altı modül seçin.' : 'Tezgah yalnız tezgah altı modüllere (C1, C2, C3) konur.'}</p>`}</section>
     <div style="display:${hasTop(c) ? 'contents' : 'none'}"><section><h2 class="sec">Kalınlık (mm)</h2>
-      <div class="tchips">${TOP_T.map(t => `<button data-act="set" data-k="top.t" data-v="${t}" data-num="1" aria-pressed="${c.top.t === t}">${t}</button>`).join('')}</div></section>
+      <div class="tchips">${TOP_T.map(t => `<button data-act="set" data-k="top.t" data-v="${t}" data-num="1" aria-pressed="${c.top.t === t}">${t}</button>`).join('')}</div>
+      ${kontraTop(c) || c.sinks.some(s => s.type === 'integrated') ? `<button data-act="toggle-kontra" aria-pressed="${!!ui.kontra}" style="margin-top:10px">${ui.kontra ? 'Porseleni göster' : 'Kontrayı göster'}</button><p class="hint" style="margin:6px 0 0">${kontraTop(c) ? 'Kalın tezgah 12 mm marin huş kontradan altı açık kutu, üstüne 6 mm porselen. ' : ''}${c.sinks.some(s => s.type === 'integrated') ? 'Eviye haznesinin dışı kontra kutu. ' : ''}Düğme porseleni gizler, kontra görünür.</p>` : ''}</section>
     <section><h2 class="sec">Renk</h2>
       <div class="sw">${TOPS.map(t => `<button data-act="set" data-k="top.color" data-v="${t.id}" aria-pressed="${c.top.color === t.id}" title="${t.name}" style="${topSwatch(t)}"></button>`).join('')}</div>
       <div class="swname">${topById(c.top.color).name}</div></section>
@@ -4078,6 +4081,7 @@ document.addEventListener('click', e => {
       refresh(); toast('Önceki tasarımınız geri yüklendi'); } break;
     case 'close-all': ui.openSet.clear(); renderStrip(); requestRender(); break;
     case 'toggle-dims': ui.dims = !ui.dims; buildScene(); renderStrip(); break;
+    case 'toggle-kontra': ui.kontra = !ui.kontra; buildScene(); refresh(); break; // tezgahta porseleni gizle, kontra kutuyu göster (kullanıcı 2026-11-19)
     case 'toggle-pos': ui.pos = !ui.pos; renderPos(); break; // modül konumu paneli (plan + ön görünüş)
     case 'cam-front': camFront(); break;
     case 'cam-top': camTop(); break;
